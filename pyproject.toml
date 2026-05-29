@@ -3,16 +3,16 @@ name = "image-restoration-allinone"
 version = "0.1.0"
 description = "All-in-one image restoration (blur, lowlight, rain, etc.) using a single model."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.13"
 dependencies = [
-    "torch>=2.3",
+    "torch>=2.9",
     "torchvision>=0.18",
     "torchaudio>=2.3",
     "torchmetrics[image]>=1.4",
     "mlflow>=2.14",
     "albumentations>=1.4",
     "Pillow>=10.4",
-    "numpy>=1.26",
+    "numpy>=2.4",
     "scipy>=1.14",
     "imageio>=2.35",
     "timm>=1.0",
