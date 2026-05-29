@@ -10,10 +10,11 @@ from image_restoration_allinone.utils.loss import CharbonnierLoss, LossComposer
 
 
 class TestCharbonnierLoss:
-    def test_zero_for_identical_inputs(self) -> None:
+    def test_returns_eps_for_identical_inputs(self) -> None:
         loss_fn = CharbonnierLoss()
         x = torch.rand(2, 3, 16, 16)
         value = loss_fn(x, x)
+        # sqrt(0^2 + eps^2) = eps, so the loss equals the epsilon value
         assert float(value.item()) == pytest.approx(1e-3, abs=1e-5)
 
     def test_positive_for_different_inputs(self) -> None:

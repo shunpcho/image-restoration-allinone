@@ -22,7 +22,7 @@ def main() -> None:
     print(f"Using device: {device}")
 
     # Data
-    train_loader, val_loader = build_dataloaders(cfg.data)
+    train_loader, val_loader = build_dataloaders(cfg.data, batch_size=cfg.train.batch_size)
 
     # Model
     model = build_model(cfg.model)

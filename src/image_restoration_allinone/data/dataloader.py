@@ -14,11 +14,13 @@ from image_restoration_allinone.data.transforms import build_train_transform, bu
 
 def build_dataloaders(
     cfg: DataConfig,
+    batch_size: int = 8,
 ) -> tuple[DataLoader[dict[str, torch.Tensor]], DataLoader[dict[str, torch.Tensor]]]:
     """Build training and validation :class:`DataLoader` objects.
 
     Args:
         cfg: Data configuration.
+        batch_size: Number of samples per training batch.
 
     Returns:
         ``(train_loader, val_loader)`` tuple.
@@ -33,7 +35,7 @@ def build_dataloaders(
 
     train_loader: DataLoader[dict[str, torch.Tensor]] = DataLoader(
         train_dataset,
-        batch_size=cfg.batch_size if hasattr(cfg, "batch_size") else 8,  # pyright: ignore[reportAttributeAccessIssue]
+        batch_size=batch_size,
         shuffle=True,
         num_workers=cfg.num_workers,
         pin_memory=cfg.pin_memory,
