@@ -110,7 +110,7 @@ docstring-quotes = "double"
 convention = "google"
 
 [tool.pyright]
-pythonVersion = "3.11"
+pythonVersion = "3.13"
 pythonPlatform = "Linux"
 typeCheckingMode = "strict"
 reportUnnecessaryComparison = "warning"
