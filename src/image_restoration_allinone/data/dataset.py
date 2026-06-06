@@ -122,7 +122,7 @@ def discover_pairs(
     return discover_pairs_category(root, lq_name, gt_name)
 
 
-class PairedRestorationDataset(Dataset[dict[str, npt.NDArray[np.float32]]]):
+class PairedRestorationDataset(Dataset[dict[str, npt.NDArray[np.float32] | torch.Tensor]]):
     """Dataset that returns ``(degraded, clean)`` image pairs.
 
     Attributes:
@@ -134,7 +134,7 @@ class PairedRestorationDataset(Dataset[dict[str, npt.NDArray[np.float32]]]):
         self,
         root: Path,
         split: str = "train",
-        transform: object = None,
+        transform: Callable[..., dict[str, Any]] | None = None,
         lq_dir_name: str = "LQ",
         gt_dir_name: str = "GT",
     ) -> None:
