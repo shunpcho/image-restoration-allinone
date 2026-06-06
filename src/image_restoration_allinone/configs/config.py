@@ -176,6 +176,10 @@ class TrainConfig:
             raise ValueError(f"batch_size must be positive, got {self.batch_size}")
         if self.total_iters <= 0:
             raise ValueError(f"total_iters must be positive, got {self.total_iters}")
+        if self.val_interval <= 0:
+            raise ValueError(f"val_interval must be positive, got {self.val_interval}")
+        if self.save_interval <= 0:
+            raise ValueError(f"save_interval must be positive, got {self.save_interval}")
         if self.lr <= 0:
             raise ValueError(f"lr must be positive, got {self.lr}")
 
