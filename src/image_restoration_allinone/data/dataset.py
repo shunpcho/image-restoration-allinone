@@ -146,13 +146,13 @@ class PairedRestorationDataset(Dataset[dict[str, npt.NDArray[np.float32]]]):
     def __len__(self) -> int:
         return len(self.pairs)
 
-    def __getitem__(self, index: int) -> dict[str, npt.NDArray[np.float32]]:
+    def __getitem__(self, index: int) -> dict[str, npt.NDArray[np.float32] | torch.Tensor]:
         degraded_path, clean_path = self.pairs[index]
         degraded = _load_image_rgb(degraded_path)
         clean = _load_image_rgb(clean_path)
 
         if self.transform is not None:
-            result = self.transform(image=degraded, clean=clean)  # pyright: ignore[reportCallIssue]
+            result = self.transform(image=degraded, clean=clean)
             degraded = result["image"]
             clean = result["clean"]
 
