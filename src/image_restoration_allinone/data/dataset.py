@@ -32,35 +32,80 @@ def discover_pairs_keyword(directory: Path) -> list[tuple[Path, Path]]:
     return pairs
 
 
-def discover_pairs_separate(directory: Path) -> list[tuple[Path, Path]]:
-    """Discover paired images from ``degre/`` and ``clean/`` sub-directories."""
-    degre_dir = directory / "degre"
-    clean_dir = directory / "clean"
-    if not degre_dir.is_dir() or not clean_dir.is_dir():
+def discover_pairs_separate(directory: Path, lq_name: str = "LQ", gt_name: str = "GT") -> list[tuple[Path, Path]]:
+    """Discover paired images from *lq_name/* and *gt_name/* sub-directories.
+
+    Args:
+        directory: Parent directory that contains the LQ and GT sub-directories.
+        lq_name: Name of the sub-directory holding low-quality (degraded) images.
+        gt_name: Name of the sub-directory holding ground-truth (clean) images.
+    """
+    lq_dir = directory / lq_name
+    gt_dir = directory / gt_name
+    if not lq_dir.is_dir() or not gt_dir.is_dir():
         return []
     pairs: list[tuple[Path, Path]] = []
-    for degraded_path in sorted(degre_dir.iterdir()):
-        clean_path = clean_dir / degraded_path.name
-        if clean_path.exists():
-            pairs.append((degraded_path, clean_path))
+    for lq_path in sorted(lq_dir.iterdir()):
+        gt_path = gt_dir / lq_path.name
+        if gt_path.exists():
+            pairs.append((lq_path, gt_path))
     return pairs
 
 
-def discover_pairs(root: Path, split: str = "train") -> list[tuple[Path, Path]]:
+def discover_pairs_category(
+    root: Path,
+    lq_name: str = "LQ",
+    gt_name: str = "GT",
+) -> list[tuple[Path, Path]]:
+    """Discover pairs from category sub-directories, each containing *lq_name/* and *gt_name/*.
+
+    Supports structures like::
+
+        root/
+        ├── Blur/
+        │   ├── LQ/
+        │   └── GT/
+        └── Haze/
+            ├── LQ/
+            └── GT/
+    """
+    pairs: list[tuple[Path, Path]] = []
+    for subdir in sorted(root.iterdir()):
+        if subdir.is_dir():
+            pairs.extend(discover_pairs_separate(subdir, lq_name, gt_name))
+    return pairs
+
+
+def discover_pairs(
+    root: Path,
+    split: str = "train",
+    lq_name: str = "LQ",
+    gt_name: str = "GT",
+) -> list[tuple[Path, Path]]:
     """Return a list of ``(degraded_path, clean_path)`` pairs.
 
-    Supports the three layouts described in ``docs/data_structure.md``:
+    Supports the following layouts:
 
     * **Case 1** - flat directory with ``_real`` / ``_mean`` files.
     * **Case 2** - ``train/`` or ``val/`` sub-directory with ``_real`` / ``_mean`` files.
-    * **Case 3** - separate ``degre/`` and ``clean/`` sub-directories.
+    * **Case 3** - separate *lq_name/* and *gt_name/* sub-directories.
+    * **Case 4** - category sub-directories each containing *lq_name/* and *gt_name/*.
+
+    Args:
+        root: Dataset root directory.
+        split: Data split sub-directory name (e.g. ``"train"`` or ``"val"``).
+        lq_name: Sub-directory name for low-quality images (default: ``"LQ"``).
+        gt_name: Sub-directory name for ground-truth images (default: ``"GT"``).
     """
     split_dir = root / split
     if split_dir.is_dir():
         pairs = discover_pairs_keyword(split_dir)
         if pairs:
             return pairs
-        pairs = discover_pairs_separate(split_dir)
+        pairs = discover_pairs_separate(split_dir, lq_name, gt_name)
+        if pairs:
+            return pairs
+        pairs = discover_pairs_category(split_dir, lq_name, gt_name)
         if pairs:
             return pairs
 
@@ -68,7 +113,10 @@ def discover_pairs(root: Path, split: str = "train") -> list[tuple[Path, Path]]:
     pairs = discover_pairs_keyword(root)
     if pairs:
         return pairs
-    return discover_pairs_separate(root)
+    pairs = discover_pairs_separate(root, lq_name, gt_name)
+    if pairs:
+        return pairs
+    return discover_pairs_category(root, lq_name, gt_name)
 
 
 class PairedRestorationDataset(Dataset[dict[str, npt.NDArray[np.float32]]]):
@@ -84,8 +132,10 @@ class PairedRestorationDataset(Dataset[dict[str, npt.NDArray[np.float32]]]):
         root: Path,
         split: str = "train",
         transform: object = None,
+        lq_dir_name: str = "LQ",
+        gt_dir_name: str = "GT",
     ) -> None:
-        self.pairs = discover_pairs(root, split)
+        self.pairs = discover_pairs(root, split, lq_dir_name, gt_dir_name)
         if not self.pairs:
             raise FileNotFoundError(
                 f"No paired images found under '{root}' for split='{split}'. "

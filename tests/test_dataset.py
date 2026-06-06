@@ -10,6 +10,7 @@ from PIL import Image
 
 from image_restoration_allinone.data.dataset import (
     discover_pairs,
+    discover_pairs_category,
     discover_pairs_keyword,
     discover_pairs_separate,
     PairedRestorationDataset,
@@ -43,16 +44,40 @@ class TestDiscoverPairsKeyword:
 
 
 class TestDiscoverPairsSeparate:
-    def test_finds_degre_clean_pairs(self, tmp_path: Path) -> None:
+    def test_finds_lq_gt_pairs(self, tmp_path: Path) -> None:
+        (tmp_path / "LQ").mkdir()
+        (tmp_path / "GT").mkdir()
+        _write_rgb(tmp_path / "LQ" / "img.png")
+        _write_rgb(tmp_path / "GT" / "img.png")
+        pairs = discover_pairs_separate(tmp_path)
+        assert len(pairs) == 1
+
+    def test_custom_dir_names(self, tmp_path: Path) -> None:
         (tmp_path / "degre").mkdir()
         (tmp_path / "clean").mkdir()
         _write_rgb(tmp_path / "degre" / "img.png")
         _write_rgb(tmp_path / "clean" / "img.png")
-        pairs = discover_pairs_separate(tmp_path)
+        pairs = discover_pairs_separate(tmp_path, lq_name="degre", gt_name="clean")
         assert len(pairs) == 1
 
     def test_returns_empty_without_dirs(self, tmp_path: Path) -> None:
         pairs = discover_pairs_separate(tmp_path)
+        assert len(pairs) == 0
+
+
+class TestDiscoverPairsCategory:
+    def test_finds_pairs_in_category_subdirs(self, tmp_path: Path) -> None:
+        for category in ("Blur", "Haze"):
+            (tmp_path / category / "LQ").mkdir(parents=True)
+            (tmp_path / category / "GT").mkdir(parents=True)
+            _write_rgb(tmp_path / category / "LQ" / "img.png")
+            _write_rgb(tmp_path / category / "GT" / "img.png")
+        pairs = discover_pairs_category(tmp_path)
+        assert len(pairs) == 2
+
+    def test_returns_empty_when_no_lq_gt(self, tmp_path: Path) -> None:
+        (tmp_path / "subdir").mkdir()
+        pairs = discover_pairs_category(tmp_path)
         assert len(pairs) == 0
 
 
@@ -72,12 +97,21 @@ class TestDiscoverPairs:
         assert len(pairs) == 1
 
     def test_case3_separate_dirs(self, tmp_path: Path) -> None:
-        (tmp_path / "degre").mkdir()
-        (tmp_path / "clean").mkdir()
-        _write_rgb(tmp_path / "degre" / "c.png")
-        _write_rgb(tmp_path / "clean" / "c.png")
+        (tmp_path / "LQ").mkdir()
+        (tmp_path / "GT").mkdir()
+        _write_rgb(tmp_path / "LQ" / "c.png")
+        _write_rgb(tmp_path / "GT" / "c.png")
         pairs = discover_pairs(tmp_path)
         assert len(pairs) == 1
+
+    def test_case4_category_subdirs(self, tmp_path: Path) -> None:
+        for category in ("Blur", "Haze"):
+            (tmp_path / category / "LQ").mkdir(parents=True)
+            (tmp_path / category / "GT").mkdir(parents=True)
+            _write_rgb(tmp_path / category / "LQ" / "d.png")
+            _write_rgb(tmp_path / category / "GT" / "d.png")
+        pairs = discover_pairs(tmp_path)
+        assert len(pairs) == 2
 
 
 # ---------------------------------------------------------------------------

@@ -18,6 +18,8 @@ class _DataConfigKwargs(TypedDict, total=False):
     use_augmentation: bool
     num_workers: int
     pin_memory: bool
+    lq_dir_name: str
+    gt_dir_name: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,6 +36,10 @@ class DataConfig:
     """Number of DataLoader worker processes."""
     pin_memory: bool = True
     """Whether to pin memory in DataLoader for faster GPU transfer."""
+    lq_dir_name: str = "LQ"
+    """Sub-directory name for low-quality (degraded) images."""
+    gt_dir_name: str = "GT"
+    """Sub-directory name for ground-truth (clean) images."""
 
     def __post_init__(self) -> None:
         if self.patch_size <= 0:
@@ -210,6 +216,8 @@ def build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("--patch-size", type=int, default=None, help="Training patch size.")
     parser.add_argument("--no-augmentation", action="store_true", help="Disable data augmentation.")
     parser.add_argument("--num-workers", type=int, default=None, help="DataLoader workers.")
+    parser.add_argument("--lq-dir-name", type=str, default=None, help="Sub-directory name for LQ images (default: LQ).")
+    parser.add_argument("--gt-dir-name", type=str, default=None, help="Sub-directory name for GT images (default: GT).")
 
     # Model
     parser.add_argument("--width", type=int, default=None, help="NAFNet base channel width.")
@@ -251,6 +259,8 @@ def config_from_args(args: argparse.Namespace) -> Config:
         patch_size=args.patch_size,
         use_augmentation=not args.no_augmentation if args.no_augmentation else None,
         num_workers=args.num_workers,
+        lq_dir_name=args.lq_dir_name,
+        gt_dir_name=args.gt_dir_name,
     )
     model = ModelConfig.from_optional_kwargs(
         width=args.width,

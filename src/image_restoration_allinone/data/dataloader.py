@@ -30,8 +30,12 @@ def build_dataloaders(
     train_transform = build_train_transform(cfg.patch_size) if cfg.use_augmentation else build_val_transform()
     val_transform = build_val_transform()
 
-    train_dataset: PairedRestorationDataset = PairedRestorationDataset(root, split="train", transform=train_transform)
-    val_dataset: PairedRestorationDataset = PairedRestorationDataset(root, split="val", transform=val_transform)
+    train_dataset: PairedRestorationDataset = PairedRestorationDataset(
+        root, split="train", transform=train_transform, lq_dir_name=cfg.lq_dir_name, gt_dir_name=cfg.gt_dir_name
+    )
+    val_dataset: PairedRestorationDataset = PairedRestorationDataset(
+        root, split="val", transform=val_transform, lq_dir_name=cfg.lq_dir_name, gt_dir_name=cfg.gt_dir_name
+    )
 
     train_loader: DataLoader[dict[str, torch.Tensor]] = DataLoader(
         train_dataset,
