@@ -56,7 +56,7 @@ def main() -> None:
         logger=logger,
     )
     try:
-        trainer.train()
+        trainer.run()
     finally:
         logger.end()
 
