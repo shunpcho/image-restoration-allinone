@@ -75,7 +75,7 @@ class Trainer:
     # Public API
     # ------------------------------------------------------------------
 
-    def train(self) -> None:
+    def run(self) -> None:
         """Run the full training loop."""
         _set_seed(self.cfg.seed)
         data_iter = _infinite_loader(self.train_loader)
@@ -83,19 +83,18 @@ class Trainer:
         for iteration in range(1, self.cfg.total_iters + 1):
             loss, components = self._train_step(next(data_iter))
 
-            # Log training metrics
-            if iteration % 100 == 0:
-                lr = self.optimizer.param_groups[0]["lr"]
-                metrics: dict[str, float] = {
-                    "train/loss": loss,
-                    "train/lr": lr,
-                    **{f"train/{k}": float(v.item()) for k, v in components.items()},
-                }
-                self._log(metrics, iteration)
-                print(f"[{iteration:>8d}/{self.cfg.total_iters}] loss={loss:.6f}  lr={lr:.2e}")
+            # Log training metrics every iteration
+            lr = self.optimizer.param_groups[0]["lr"]
+            metrics: dict[str, float] = {
+                "train/loss": loss,
+                "train/lr": lr,
+                **{f"train/{k}": float(v.item()) for k, v in components.items()},
+            }
+            self._log(metrics, iteration)
+            print(f"[{iteration:>8d}/{self.cfg.total_iters}] loss={loss:.6f}  lr={lr:.2e}")
 
-            # Validation
-            if iteration % self.cfg.val_interval == 0:
+            # Validation on iteration 1 and every val_interval iterations
+            if iteration == 1 or iteration % self.cfg.val_interval == 0:
                 val_metrics = self.evaluator.run()
                 self._log(val_metrics, iteration)
                 print(
