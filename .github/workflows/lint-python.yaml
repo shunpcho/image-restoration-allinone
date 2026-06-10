@@ -25,9 +25,11 @@ jobs:
       - name: Install dependencies
         run: uv sync --group lint
 
-      - name: Run ruff
-        run: uv run ruff check src tests
+      - name: Run ruff format (check)
+        run: uv run ruff format --check .
 
+      - name: Run ruff
+        run: uv run ruff check .
   typing-lint:
     runs-on: ubuntu-22.04
     steps:
