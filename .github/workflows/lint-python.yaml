@@ -16,19 +16,18 @@ jobs:
             pyproject.toml
             uv.lock
           uv-version: "0.8.3"
-      
+
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version-file: "pyproject.toml"
-      
+
       - name: Install dependencies
         run: uv sync --group lint
-      
+
       - name: Run ruff
         run: uv run ruff check src tests
 
-jobs:
   typing-lint:
     runs-on: ubuntu-22.04
     steps:
@@ -43,14 +42,14 @@ jobs:
             pyproject.toml
             uv.lock
           uv-version: "0.8.3"
-      
+
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version-file: "pyproject.toml"
-      
+
       - name: Install dependencies
         run: uv sync --group lint
-      
+
       - name: Run pyright
         run: uv run pyright src tests
