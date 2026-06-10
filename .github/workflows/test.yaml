@@ -19,12 +19,12 @@ jobs:
           uv-version: "0.8.3"
 
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v6
         with:
-          python-version-file: "pyproject.toml"
+          python-version: "3.13"
 
       - name: Install dependencies
-        run: uv sync --group tests
+        run: uv sync --group test
 
       - name: Run pytests
         run: uv run pytest .
