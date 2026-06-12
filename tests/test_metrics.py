@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import pytest
+import pytest  # pyright: ignore[reportMissingImports]
 import torch
 
 from image_restoration_allinone.utils.metrics import (

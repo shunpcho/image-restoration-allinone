@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
-import pytest
+import pytest  # pyright: ignore[reportMissingImports]
 from PIL import Image
 
 from image_restoration_allinone.data.dataset import (
