@@ -75,6 +75,11 @@ def discover_pairs(
         val_ratio: Fraction of all pairs reserved for validation (default: ``0.1``).
         seed: Random seed for reproducible shuffling (default: ``42``).
     """
+    if split not in {"train", "val"}:
+        raise ValueError(f"split must be 'train' or 'val', got {split!r}")
+    if not 0.0 <= val_ratio < 1.0:
+        raise ValueError(f"val_ratio must be in [0.0, 1.0), got {val_ratio}")
+
     all_pairs = list(discover_pairs_category(root, lq_name, gt_name))
     rng = random.Random(seed)
     rng.shuffle(all_pairs)
