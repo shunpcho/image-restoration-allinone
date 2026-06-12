@@ -7,6 +7,18 @@ import torchmetrics
 from torchmetrics.image import PeakSignalNoiseRatio, StructuralSimilarityIndexMeasure
 
 
+def _to_scalar(metric_value: torch.Tensor | tuple[torch.Tensor, torch.Tensor]) -> float:
+    """Convert a metric output to a Python float.
+
+    Some metric APIs may return either a scalar tensor or a tuple where the
+    first element is the scalar value and the second element is an auxiliary
+    output (for example, a full-image map).
+    """
+    if isinstance(metric_value, tuple):
+        metric_value = metric_value[0]
+    return float(metric_value.item())
+
+
 @torch.inference_mode()
 def compute_psnr(pred: torch.Tensor, target: torch.Tensor) -> float:
     """Return average PSNR (dB) over a batch.
@@ -47,7 +59,9 @@ class RunningMetrics:
 
     def __init__(self, device: torch.device) -> None:
         self._psnr: PeakSignalNoiseRatio = PeakSignalNoiseRatio(data_range=1.0).to(device)
-        self._ssim: StructuralSimilarityIndexMeasure = StructuralSimilarityIndexMeasure(data_range=1.0).to(device)
+        self._ssim: StructuralSimilarityIndexMeasure = StructuralSimilarityIndexMeasure(
+            data_range=1.0, return_full_image=False
+        ).to(device)
         self._mse: torchmetrics.MeanSquaredError = torchmetrics.MeanSquaredError().to(device)
 
     def update(self, pred: torch.Tensor, target: torch.Tensor) -> None:
@@ -57,10 +71,16 @@ class RunningMetrics:
         self._mse.update(pred.flatten(), target.flatten())
 
     def compute(self) -> dict[str, float]:
-        """Return accumulated metrics and reset internal state."""
+        """Return accumulated metrics and reset internal state.
+
+        ``StructuralSimilarityIndexMeasure.compute()`` is typed as returning
+        either ``torch.Tensor`` or ``tuple[torch.Tensor, torch.Tensor]``.
+        We normalize that union with ``_to_scalar`` so static type checkers can
+        verify this method without ignores.
+        """
         results = {
             "psnr": float(self._psnr.compute().item()),
-            "ssim": float(self._ssim.compute().item()),
+            "ssim": _to_scalar(self._ssim.compute()),
             "mse": float(self._mse.compute().item()),
         }
         self.reset()

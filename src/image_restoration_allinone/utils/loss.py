@@ -42,14 +42,14 @@ class SSIMLoss(nn.Module):
     def __init__(self) -> None:
         super().__init__()
         try:
-            from pytorch_msssim import ssim  # pyright: ignore[reportMissingModuleSource]
+            from pytorch_msssim import ssim
 
             self._ssim_fn = ssim
         except ImportError as exc:
             raise ImportError("Install pytorch-msssim to use SSIMLoss.") from exc
 
     def forward(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
-        return 1.0 - self._ssim_fn(pred, target, data_range=1.0, size_average=True)  # pyright: ignore[reportReturnType]
+        return 1.0 - self._ssim_fn(pred, target, data_range=1.0, size_average=True)
 
 
 class PerceptualLoss(nn.Module):
@@ -58,7 +58,7 @@ class PerceptualLoss(nn.Module):
     def __init__(self) -> None:
         super().__init__()
         try:
-            import lpips  # pyright: ignore[reportMissingModuleSource]
+            import lpips
 
             self._lpips = lpips.LPIPS(net="vgg")
         except ImportError as exc:
@@ -68,7 +68,7 @@ class PerceptualLoss(nn.Module):
         # LPIPS expects inputs in [-1, 1]
         pred_scaled = pred * 2.0 - 1.0
         target_scaled = target * 2.0 - 1.0
-        return self._lpips(pred_scaled, target_scaled).mean()  # pyright: ignore[reportReturnType]
+        return self._lpips(pred_scaled, target_scaled).mean()
 
 
 # ---------------------------------------------------------------------------

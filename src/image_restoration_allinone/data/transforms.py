@@ -24,6 +24,20 @@ def build_train_transform(patch_size: int) -> A.Compose:
     )
 
 
+def build_default_transform() -> A.Compose:
+    """Return an albumentations pipeline for training and validation.
+
+    Both the degraded and the clean image receive **identical** spatial transforms.
+    Color/intensity transforms are applied only to the degraded image.
+    """
+    return A.Compose(
+        [
+            ToTensorV2(),  # HWC → CHW, stays float32 in [0, 1]
+        ],
+        additional_targets={"clean": "image"},
+    )
+
+
 def build_val_transform() -> A.Compose:
     """Return an albumentations pipeline for validation (no random ops)."""
     return A.Compose(

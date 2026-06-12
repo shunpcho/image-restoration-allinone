@@ -130,8 +130,8 @@ class TestPairedRestorationDataset:
         ds = PairedRestorationDataset(tmp_path)
         assert len(ds) == 1
         item = ds[0]
-        assert item["degraded"].shape == (4, 4, 3)
-        assert item["clean"].shape == (4, 4, 3)
+        assert item["degraded"].shape == (3, 4, 4)
+        assert item["clean"].shape == (3, 4, 4)
 
     def test_values_in_unit_range(self, tmp_path: Path) -> None:
         _write_rgb(tmp_path / "x_real.png", (255, 0, 0))

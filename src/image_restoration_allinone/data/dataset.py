@@ -12,6 +12,8 @@ import torch
 from PIL import Image
 from torch.utils.data import Dataset
 
+from image_restoration_allinone.data.transforms import build_default_transform
+
 
 def _load_image_rgb(path: Path) -> npt.NDArray[np.float32]:
     """Load an image from *path* and return a float32 array in [0, 1] (H, W, 3)."""
@@ -122,7 +124,7 @@ def discover_pairs(
     return discover_pairs_category(root, lq_name, gt_name)
 
 
-class PairedRestorationDataset(Dataset[dict[str, npt.NDArray[np.float32] | torch.Tensor]]):
+class PairedRestorationDataset(Dataset[dict[str, torch.Tensor]]):
     """Dataset that returns ``(degraded, clean)`` image pairs.
 
     Attributes:
@@ -149,13 +151,19 @@ class PairedRestorationDataset(Dataset[dict[str, npt.NDArray[np.float32] | torch
     def __len__(self) -> int:
         return len(self.pairs)
 
-    def __getitem__(self, index: int) -> dict[str, npt.NDArray[np.float32] | torch.Tensor]:
+    def __getitem__(self, index: int) -> dict[str, torch.Tensor]:
         degraded_path, clean_path = self.pairs[index]
         degraded = _load_image_rgb(degraded_path)
         clean = _load_image_rgb(clean_path)
 
         if self.transform is not None:
             result = self.transform(image=degraded, clean=clean)
+            degraded = result["image"]
+            clean = result["clean"]
+        else:
+            # Transform numpy arrays to torch tensors if no transform is provided
+            transform = build_default_transform()
+            result = transform(image=degraded, clean=clean)
             degraded = result["image"]
             clean = result["clean"]
 
