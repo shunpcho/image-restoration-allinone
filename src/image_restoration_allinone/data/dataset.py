@@ -102,7 +102,14 @@ class PairedRestorationDataset(Dataset[dict[str, torch.Tensor]]):
         val_ratio: float = 0.1,
         seed: int = 42,
     ) -> None:
-        self.pairs = discover_pairs(root, split, lq_dir_name, gt_dir_name, val_ratio, seed)
+        self.pairs = discover_pairs(
+            root=root,
+            split=split,
+            lq_name=lq_dir_name,
+            gt_name=gt_dir_name,
+            val_ratio=val_ratio,
+            seed=seed,
+        )
         if not self.pairs:
             raise FileNotFoundError(
                 f"No paired images found under '{root}' for split='{split}'. "
