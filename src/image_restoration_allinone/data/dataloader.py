@@ -34,10 +34,22 @@ def build_dataloaders(
     val_transform = build_val_transform()
 
     train_dataset: PairedRestorationDataset = PairedRestorationDataset(
-        root, split="train", transform=train_transform, lq_dir_name=cfg.lq_dir_name, gt_dir_name=cfg.gt_dir_name
+        root,
+        split="train",
+        transform=train_transform,
+        lq_dir_name=cfg.lq_dir_name,
+        gt_dir_name=cfg.gt_dir_name,
+        val_ratio=cfg.val_ratio,
+        seed=cfg.val_split_seed,
     )
     val_dataset: PairedRestorationDataset = PairedRestorationDataset(
-        root, split="val", transform=val_transform, lq_dir_name=cfg.lq_dir_name, gt_dir_name=cfg.gt_dir_name
+        root,
+        split="val",
+        transform=val_transform,
+        lq_dir_name=cfg.lq_dir_name,
+        gt_dir_name=cfg.gt_dir_name,
+        val_ratio=cfg.val_ratio,
+        seed=cfg.val_split_seed,
     )
 
     train_loader: DataLoader[dict[str, torch.Tensor]] = DataLoader(
