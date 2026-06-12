@@ -122,7 +122,7 @@ def discover_pairs(
     return discover_pairs_category(root, lq_name, gt_name)
 
 
-class PairedRestorationDataset(Dataset[dict[str, npt.NDArray[np.float32] | torch.Tensor]]):
+class PairedRestorationDataset(Dataset[dict[str, torch.Tensor]]):
     """Dataset that returns ``(degraded, clean)`` image pairs.
 
     Attributes:
@@ -149,7 +149,7 @@ class PairedRestorationDataset(Dataset[dict[str, npt.NDArray[np.float32] | torch
     def __len__(self) -> int:
         return len(self.pairs)
 
-    def __getitem__(self, index: int) -> dict[str, npt.NDArray[np.float32] | torch.Tensor]:
+    def __getitem__(self, index: int) -> dict[str, torch.Tensor]:
         degraded_path, clean_path = self.pairs[index]
         degraded = _load_image_rgb(degraded_path)
         clean = _load_image_rgb(clean_path)
@@ -158,5 +158,9 @@ class PairedRestorationDataset(Dataset[dict[str, npt.NDArray[np.float32] | torch
             result = self.transform(image=degraded, clean=clean)
             degraded = result["image"]
             clean = result["clean"]
+        else:
+            # Transform numpy arrays to torch tensors if no transform is provided
+            degraded = torch.from_numpy(degraded).permute(2, 0, 1)  # (H, W, C) → (C, H, W)
+            clean = torch.from_numpy(clean).permute(2, 0, 1)  # (H, W, C) → (C, H, W)
 
         return {"degraded": degraded, "clean": clean}

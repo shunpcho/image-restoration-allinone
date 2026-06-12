@@ -47,7 +47,7 @@ class DataConfig:
 
     @classmethod
     def from_optional_kwargs(cls, **kwargs: Unpack[_DataConfigKwargs]) -> Self:
-        return cls(**{key: value for key, value in kwargs.items() if value is not None})
+        return cls(**{key: value for key, value in kwargs.items() if value is not None})  # pyright: ignore[reportArgumentType]
 
 
 # ---------------------------------------------------------------------------
@@ -86,7 +86,7 @@ class ModelConfig:
 
     @classmethod
     def from_optional_kwargs(cls, **kwargs: Unpack[_ModelConfigKwargs]) -> Self:
-        return cls(**{key: value for key, value in kwargs.items() if value is not None})
+        return cls(**{key: value for key, value in kwargs.items() if value is not None})  # pyright: ignore[reportArgumentType]
 
 
 # ---------------------------------------------------------------------------
@@ -119,7 +119,7 @@ class LossConfig:
 
     @classmethod
     def from_optional_kwargs(cls, **kwargs: Unpack[_LossConfigKwargs]) -> Self:
-        return cls(**{key: value for key, value in kwargs.items() if value is not None})
+        return cls(**{key: value for key, value in kwargs.items() if value is not None})  # pyright: ignore[reportArgumentType]
 
 
 # ---------------------------------------------------------------------------
@@ -185,7 +185,7 @@ class TrainConfig:
 
     @classmethod
     def from_optional_kwargs(cls, **kwargs: Unpack[_TrainConfigKwargs]) -> Self:
-        return cls(**{key: value for key, value in kwargs.items() if value is not None})
+        return cls(**{key: value for key, value in kwargs.items() if value is not None})  # pyright: ignore[reportArgumentType]
 
 
 # ---------------------------------------------------------------------------
@@ -251,7 +251,7 @@ def build_argument_parser() -> argparse.ArgumentParser:
 
 def config_from_args(args: argparse.Namespace) -> Config:
     """Build a :class:`Config` from parsed CLI arguments."""
-    losses: dict[str, float] | None = None
+    losses: dict[str, float] = {"mse": 1.0}  # default
     if args.losses is not None:
         losses = {}
         for pair in args.losses.split(","):
@@ -261,7 +261,7 @@ def config_from_args(args: argparse.Namespace) -> Config:
     data = DataConfig.from_optional_kwargs(
         data_root=args.data_root,
         patch_size=args.patch_size,
-        use_augmentation=not args.no_augmentation if args.no_augmentation else None,
+        use_augmentation=not args.no_augmentation if args.no_augmentation else True,
         num_workers=args.num_workers,
         lq_dir_name=args.lq_dir_name,
         gt_dir_name=args.gt_dir_name,
@@ -283,6 +283,6 @@ def config_from_args(args: argparse.Namespace) -> Config:
         lr=args.lr,
         lr_min=args.lr_min,
         seed=args.seed,
-        amp=not args.no_amp if args.no_amp else None,
+        amp=not args.no_amp if args.no_amp else True,
     )
     return Config(data=data, model=model, loss=loss, train=train)

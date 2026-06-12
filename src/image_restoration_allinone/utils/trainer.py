@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 import torch
 from torch import nn
-from torch.cuda.amp import GradScaler  # pyright: ignore[reportDeprecated]
+from torch.amp.grad_scaler import GradScaler
 from torch.utils.data import DataLoader
 
 from image_restoration_allinone.configs.config import TrainConfig
@@ -65,7 +65,8 @@ class Trainer:
             T_max=cfg.total_iters,
             eta_min=cfg.lr_min,
         )
-        self.scaler: GradScaler = GradScaler(enabled=cfg.amp)
+        amp_device = "cuda" if device.type == "cuda" else "cpu"
+        self.scaler: GradScaler = GradScaler(amp_device, enabled=cfg.amp and device.type == "cuda")
 
         self.evaluator = Evaluator(model, criterion, val_loader, device)
         self.output_dir = Path(cfg.output_dir)
@@ -121,7 +122,7 @@ class Trainer:
         clean = batch["clean"].to(self.device)
 
         self.optimizer.zero_grad(set_to_none=True)
-        with torch.autocast(device_type=self.device.type, enabled=self.cfg.amp):  # pyright: ignore[reportAttributeAccessIssue]
+        with torch.autocast(device_type=self.device.type, enabled=self.cfg.amp):
             restored = self.model(degraded)
             total_loss, components = self.criterion(restored, clean)
 
@@ -157,7 +158,7 @@ class Trainer:
 
 def _infinite_loader(
     loader: DataLoader[dict[str, torch.Tensor]],
-) -> Generator[dict[str, torch.Tensor], None, None]:
+) -> Generator[dict[str, torch.Tensor]]:
     """Yield batches indefinitely by restarting the DataLoader."""
     while True:
         yield from loader

@@ -15,7 +15,10 @@ from image_restoration_allinone.data.transforms import build_train_transform, bu
 def build_dataloaders(
     cfg: DataConfig,
     batch_size: int = 8,
-) -> tuple[DataLoader[dict[str, torch.Tensor]], DataLoader[dict[str, torch.Tensor]]]:
+) -> tuple[
+    DataLoader[dict[str, torch.Tensor]],
+    DataLoader[dict[str, torch.Tensor]],
+]:
     """Build training and validation :class:`DataLoader` objects.
 
     Args:
