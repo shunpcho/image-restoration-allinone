@@ -12,6 +12,8 @@ import torch
 from PIL import Image
 from torch.utils.data import Dataset
 
+from image_restoration_allinone.data.transforms import build_default_transform
+
 
 def _load_image_rgb(path: Path) -> npt.NDArray[np.float32]:
     """Load an image from *path* and return a float32 array in [0, 1] (H, W, 3)."""
@@ -160,7 +162,9 @@ class PairedRestorationDataset(Dataset[dict[str, torch.Tensor]]):
             clean = result["clean"]
         else:
             # Transform numpy arrays to torch tensors if no transform is provided
-            degraded = torch.from_numpy(degraded).permute(2, 0, 1)  # (H, W, C) → (C, H, W)
-            clean = torch.from_numpy(clean).permute(2, 0, 1)  # (H, W, C) → (C, H, W)
+            transform = build_default_transform()
+            result = transform(image=degraded, clean=clean)
+            degraded = result["image"]
+            clean = result["clean"]
 
         return {"degraded": degraded, "clean": clean}
