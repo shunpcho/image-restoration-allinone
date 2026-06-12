@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import pytest  # pyright: ignore[reportMissingImports]
+import pytest
 import torch
 
 from image_restoration_allinone.configs.config import ModelConfig
@@ -12,7 +12,7 @@ _DEVICE = torch.device("cpu")
 
 
 class TestNAFNet:
-    @pytest.fixture  # pyright: ignore[reportUntypedFunctionDecorator]
+    @pytest.fixture
     def model(self) -> NAFNet:
         cfg = ModelConfig(width=8, num_enc_blks=(1, 1), middle_blk_num=1, num_dec_blks=(1, 1))
         return build_model(cfg).to(_DEVICE)
