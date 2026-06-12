@@ -75,7 +75,7 @@ def discover_pairs(
         val_ratio: Fraction of all pairs reserved for validation (default: ``0.1``).
         seed: Random seed for reproducible shuffling (default: ``42``).
     """
-    all_pairs = discover_pairs_category(root, lq_name, gt_name)
+    all_pairs = list(discover_pairs_category(root, lq_name, gt_name))
     rng = random.Random(seed)
     rng.shuffle(all_pairs)
     n_val = int(len(all_pairs) * val_ratio)
