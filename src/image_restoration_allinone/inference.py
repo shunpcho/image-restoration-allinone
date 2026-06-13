@@ -31,6 +31,29 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def _save_images(
+    model: torch.nn.Module,
+    val_loader: DataLoader[dict[str, torch.Tensor]],
+    output_dir: Path,
+    device: torch.device,
+) -> None:
+    """Run inference and write side-by-side comparison images to *output_dir*."""
+    output_dir.mkdir(parents=True, exist_ok=True)
+    model.eval()
+    with torch.inference_mode():
+        for idx, batch in enumerate(val_loader):
+            degraded: torch.Tensor = batch["degraded"].to(device)
+            clean: torch.Tensor = batch["clean"].to(device)
+            restored = model(degraded)
+            save_comparison(
+                degraded[0],
+                restored[0],
+                clean[0],
+                output_dir / f"{idx:04d}.png",
+            )
+    print(f"Saved comparison images to {output_dir}")
+
+
 def main() -> None:
     """Load a checkpoint and evaluate on the specified split."""
     args = _parse_args()
@@ -62,22 +85,12 @@ def main() -> None:
     for key, value in metrics.items():
         print(f"  {key}: {value:.6f}")
 
+    final_score = metrics["val/psnr_y"] + 10.0 * metrics["val/ssim_y"] - 5.0 * metrics["val/lpips"]
+    print(f"\n  Final_Score (PSNR_Y + 10*SSIM_Y - 5*LPIPS): {final_score:.6f}")
+
     # Optional: save comparison images
     if args.save_images:
-        args.output_dir.mkdir(parents=True, exist_ok=True)
-        model.eval()
-        with torch.inference_mode():
-            for idx, batch in enumerate(val_loader):
-                degraded: torch.Tensor = batch["degraded"].to(device)
-                clean: torch.Tensor = batch["clean"].to(device)
-                restored = model(degraded)
-                save_comparison(
-                    degraded[0],
-                    restored[0],
-                    clean[0],
-                    args.output_dir / f"{idx:04d}.png",
-                )
-        print(f"Saved comparison images to {args.output_dir}")
+        _save_images(model, val_loader, args.output_dir, device)
 
 
 if __name__ == "__main__":
