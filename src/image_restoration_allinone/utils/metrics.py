@@ -90,9 +90,9 @@ class RunningMetrics:
             data_range=1.0, return_full_image=False
         ).to(device)
         self._mse: torchmetrics.MeanSquaredError = torchmetrics.MeanSquaredError().to(device)
-        self._psnr_y: PeakSignalNoiseRatio = PeakSignalNoiseRatio(data_range=255.0).to(device)
+        self._psnr_y: PeakSignalNoiseRatio = PeakSignalNoiseRatio(data_range=219.0).to(device)
         self._ssim_y: StructuralSimilarityIndexMeasure = StructuralSimilarityIndexMeasure(
-            data_range=255.0, return_full_image=False
+            data_range=219.0, return_full_image=False
         ).to(device)
         self._lpips: LearnedPerceptualImagePatchSimilarity = LearnedPerceptualImagePatchSimilarity(
             net_type="alex", normalize=True
