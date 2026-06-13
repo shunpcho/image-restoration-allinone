@@ -72,7 +72,7 @@ def compute_mse(pred: torch.Tensor, target: torch.Tensor) -> float:
 class RunningMetrics:
     """Accumulate PSNR, SSIM, MSE, and LPIPS across multiple batches.
 
-    Y-channel variants of PSNR and SSIM use BT.601 luminance values in [0, 255].
+    Y-channel variants of PSNR and SSIM use BT.601 studio-swing luminance values in [16, 235].
     LPIPS is computed on full RGB images in [0, 1]; normalization to [-1, 1]
     is handled internally by ``LearnedPerceptualImagePatchSimilarity``.
 
