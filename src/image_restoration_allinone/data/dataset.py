@@ -76,6 +76,9 @@ def discover_pairs(
         gt_name: Sub-directory name for ground-truth images (default: ``"GT"``).
         val_ratio: Fraction of all pairs reserved for validation (default: ``0.1``).
         seed: Random seed for reproducible shuffling (default: ``42``).
+
+    Raises:
+        ValueError: If *split* is not one of ``"train"`` or ``"val"``, or if *val_ratio* is not in [0.0, 1.0).
     """
     if split not in {"train", "val"}:
         raise ValueError(f"split must be 'train' or 'val', got {split!r}")
