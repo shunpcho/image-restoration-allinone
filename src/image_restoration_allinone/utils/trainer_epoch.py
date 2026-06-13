@@ -110,9 +110,11 @@ class Trainer:
             degraded = batch["degraded"].to(self.device)
             clean = batch["clean"].to(self.device)
 
-            self.optimizer.zero_grad()
+            if train:
+                self.optimizer.zero_grad()
             with torch.autocast(self.device.type, enabled=self.cfg.amp):
-                loss, component = self.criterion(degraded, clean)
+                restored = self.model(degraded)
+                loss, component = self.criterion(restored, clean)
                 total_loss += loss.detach()
                 for key, value in component.items():
                     total_components[key] = (
