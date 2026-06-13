@@ -141,6 +141,9 @@ class _TrainConfigKwargs(TypedDict, total=False):
     total_iters: int
     val_interval: int
     save_interval: int
+    epochs: int
+    val_interval_epoch: int
+    checkpoint_freq: int
     lr: float
     lr_min: float
     weight_decay: float
@@ -166,6 +169,12 @@ class TrainConfig:
     """Run validation every N iterations."""
     save_interval: int = 10_000
     """Save a checkpoint every N iterations."""
+    epochs: int = 100
+    """Total number of epochs (for trainer_epoch.py)."""
+    val_interval_epoch: int = 1
+    """Run validation every N epochs (for trainer_epoch.py)."""
+    checkpoint_freq: int = 10
+    """Frequency of saving checkpoints (in epochs)."""
     lr: float = 1e-3
     """Peak learning rate for AdamW."""
     lr_min: float = 1e-7
@@ -186,6 +195,12 @@ class TrainConfig:
             raise ValueError(f"val_interval must be positive, got {self.val_interval}")
         if self.save_interval <= 0:
             raise ValueError(f"save_interval must be positive, got {self.save_interval}")
+        if self.epochs <= 0:
+            raise ValueError(f"epochs must be positive, got {self.epochs}")
+        if self.val_interval_epoch <= 0:
+            raise ValueError(f"val_interval_epoch must be positive, got {self.val_interval_epoch}")
+        if self.checkpoint_freq <= 0:
+            raise ValueError(f"checkpoint_freq must be positive, got {self.checkpoint_freq}")
         if self.lr <= 0:
             raise ValueError(f"lr must be positive, got {self.lr}")
 
@@ -254,6 +269,9 @@ def build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("--total-iters", type=int, default=None)
     parser.add_argument("--val-interval", type=int, default=None)
     parser.add_argument("--save-interval", type=int, default=None)
+    parser.add_argument("--epochs", type=int, default=None)
+    parser.add_argument("--val-interval-epoch", type=int, default=None)
+    parser.add_argument("--checkpoint-freq", type=int, default=None)
     parser.add_argument("--lr", type=float, default=None)
     parser.add_argument("--lr-min", type=float, default=None)
     parser.add_argument("--seed", type=int, default=None)
@@ -294,6 +312,9 @@ def config_from_args(args: argparse.Namespace) -> Config:
         total_iters=args.total_iters,
         val_interval=args.val_interval,
         save_interval=args.save_interval,
+        epochs=args.epochs,
+        val_interval_epoch=args.val_interval_epoch,
+        checkpoint_freq=args.checkpoint_freq,
         lr=args.lr,
         lr_min=args.lr_min,
         seed=args.seed,

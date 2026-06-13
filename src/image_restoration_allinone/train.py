@@ -9,7 +9,7 @@ from image_restoration_allinone.data.dataloader import build_dataloaders
 from image_restoration_allinone.models.network import build_model
 from image_restoration_allinone.utils.logger import MLflowLogger
 from image_restoration_allinone.utils.loss import LossComposer
-from image_restoration_allinone.utils.trainer import Trainer
+from image_restoration_allinone.utils.trainer_epoch import Trainer
 
 
 def main() -> None:
