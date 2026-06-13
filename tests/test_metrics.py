@@ -6,6 +6,7 @@ import pytest
 import torch
 
 from image_restoration_allinone.utils.metrics import (
+    compute_lpips,
     compute_mse,
     compute_psnr,
     compute_ssim,
@@ -13,6 +14,17 @@ from image_restoration_allinone.utils.metrics import (
 )
 
 _DEVICE = torch.device("cpu")
+
+
+class TestComputeLpips:
+    def test_zero_for_identical(self) -> None:
+        x = torch.rand(1, 3, 64, 64)
+        assert compute_lpips(x, x) == pytest.approx(0.0, abs=1e-4)
+
+    def test_positive_for_different(self) -> None:
+        x = torch.zeros(1, 3, 64, 64)
+        y = torch.ones(1, 3, 64, 64)
+        assert compute_lpips(x, y) > 0.0
 
 
 class TestComputeMse:
@@ -56,10 +68,13 @@ class TestRunningMetrics:
         x = torch.rand(1, 3, 32, 32)
         rm.update(x, x)
         result = rm.compute()
-        assert set(result.keys()) == {"psnr", "ssim", "mse"}
+        assert set(result.keys()) == {"psnr", "ssim", "mse", "psnr_y", "ssim_y", "lpips"}
         assert result["mse"] == pytest.approx(0.0, abs=1e-6)
         assert result["ssim"] == pytest.approx(1.0, abs=1e-4)
         assert result["psnr"] > 80.0
+        assert result["ssim_y"] == pytest.approx(1.0, abs=1e-4)
+        assert result["psnr_y"] > 80.0
+        assert result["lpips"] == pytest.approx(0.0, abs=1e-4)
 
     def test_reset_clears_state(self) -> None:
         rm = RunningMetrics(_DEVICE)

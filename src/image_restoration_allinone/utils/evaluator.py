@@ -1,4 +1,4 @@
-"""Evaluator: run validation and compute loss, MSE, PSNR, SSIM."""
+"""Evaluator: run validation and compute loss, MSE, PSNR, SSIM, LPIPS."""
 
 from __future__ import annotations
 
@@ -14,10 +14,13 @@ class Evaluator:
 
     Recorded metrics per validation run:
 
-    * ``val/loss``  - mean total loss (using the same criterion as training)
-    * ``val/mse``   - mean pixel-wise MSE
-    * ``val/psnr``  - mean PSNR (dB)
-    * ``val/ssim``  - mean SSIM
+    * ``val/loss``   - mean total loss (using the same criterion as training)
+    * ``val/mse``    - mean pixel-wise MSE
+    * ``val/psnr``   - mean PSNR (dB) on full RGB in [0, 1]
+    * ``val/ssim``   - mean SSIM on full RGB in [0, 1]
+    * ``val/psnr_y`` - mean PSNR (dB) on Y (luminance) channel
+    * ``val/ssim_y`` - mean SSIM on Y (luminance) channel
+    * ``val/lpips``  - mean LPIPS (AlexNet)
 
     Args:
         model: The restoration network (in eval mode).
@@ -44,7 +47,8 @@ class Evaluator:
         """Evaluate the model and return a metrics dictionary.
 
         Returns:
-            Dict with keys ``val/loss``, ``val/mse``, ``val/psnr``, ``val/ssim``.
+            Dict with keys ``val/loss``, ``val/mse``, ``val/psnr``, ``val/ssim``,
+            ``val/psnr_y``, ``val/ssim_y``, and ``val/lpips``.
         """
         self.model.eval()
         self._metrics.reset()
@@ -71,4 +75,7 @@ class Evaluator:
             "val/mse": image_metrics["mse"],
             "val/psnr": image_metrics["psnr"],
             "val/ssim": image_metrics["ssim"],
+            "val/psnr_y": image_metrics["psnr_y"],
+            "val/ssim_y": image_metrics["ssim_y"],
+            "val/lpips": image_metrics["lpips"],
         }
