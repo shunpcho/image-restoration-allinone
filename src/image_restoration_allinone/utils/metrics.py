@@ -21,13 +21,22 @@ def _to_scalar(metric_value: torch.Tensor | tuple[torch.Tensor, torch.Tensor]) -
 
 
 def _rgb_to_y(img: torch.Tensor) -> torch.Tensor:
-    """Convert an RGB tensor in [0, 1] to the Y (luminance) channel.
+    """Convert an RGB tensor in [0, 1] to the Y (luminance) channel of YCbCr.
 
-    Uses BT.601 studio-swing coefficients, so output values fall in the
-    range [16, 235] (not [0, 255]).  Shape: ``(B, C, H, W)`` → ``(B, 1, H, W)``.
+    Uses BT.601 studio-swing coefficients; output values fall in [16, 235].
+    Shape: ``(B, C, H, W)`` → ``(B, 1, H, W)``.
+    ``data_range=255.0`` is the correct torchmetrics setting for this output.
     """
     r, g, b = img[:, 0:1], img[:, 1:2], img[:, 2:3]
     return 65.481 * r + 128.553 * g + 24.966 * b + 16.0
+
+
+def _normalize_to_neg1_1(img: torch.Tensor) -> torch.Tensor:
+    """Map an image tensor from [0, 1] to [-1, 1].
+
+    Used to prepare inputs for LPIPS, which expects values in ``[-1, 1]``.
+    """
+    return img * 2.0 - 1.0
 
 
 @torch.inference_mode()
@@ -35,11 +44,13 @@ def compute_lpips(pred: torch.Tensor, target: torch.Tensor) -> float:
     """Return average LPIPS over a batch.
 
     Inputs are expected in ``[0, 1]`` with shape ``(B, C, H, W)`` and ``C == 3``.
+    They are normalized to ``[-1, 1]`` before being passed to the AlexNet-based
+    LPIPS metric (``normalize=False`` since normalization is done explicitly).
     """
     metric: LearnedPerceptualImagePatchSimilarity = LearnedPerceptualImagePatchSimilarity(
-        net_type="alex", normalize=True
+        net_type="alex", normalize=False
     ).to(pred.device)
-    return float(metric(pred, target).item())
+    return float(metric(_normalize_to_neg1_1(pred), _normalize_to_neg1_1(target)).item())
 
 
 @torch.inference_mode()
@@ -72,9 +83,11 @@ def compute_mse(pred: torch.Tensor, target: torch.Tensor) -> float:
 class RunningMetrics:
     """Accumulate PSNR, SSIM, MSE, and LPIPS across multiple batches.
 
-    Y-channel variants of PSNR and SSIM use BT.601 studio-swing luminance values in [16, 235].
-    LPIPS is computed on full RGB images in [0, 1]; normalization to [-1, 1]
-    is handled internally by ``LearnedPerceptualImagePatchSimilarity``.
+    Y-channel PSNR and SSIM are computed after converting RGB [0, 1] to the
+    BT.601 YCbCr Y channel (values in [16, 235]); ``data_range=255.0`` is used
+    to match the standard 8-bit evaluation convention.
+    LPIPS inputs are explicitly normalized from [0, 1] to [-1, 1] before being
+    passed to the AlexNet-based metric.
 
     Example::
 
@@ -90,12 +103,12 @@ class RunningMetrics:
             data_range=1.0, return_full_image=False
         ).to(device)
         self._mse: torchmetrics.MeanSquaredError = torchmetrics.MeanSquaredError().to(device)
-        self._psnr_y: PeakSignalNoiseRatio = PeakSignalNoiseRatio(data_range=219.0).to(device)
+        self._psnr_y: PeakSignalNoiseRatio = PeakSignalNoiseRatio(data_range=255.0).to(device)
         self._ssim_y: StructuralSimilarityIndexMeasure = StructuralSimilarityIndexMeasure(
-            data_range=219.0, return_full_image=False
+            data_range=255.0, return_full_image=False
         ).to(device)
         self._lpips: LearnedPerceptualImagePatchSimilarity = LearnedPerceptualImagePatchSimilarity(
-            net_type="alex", normalize=True
+            net_type="alex", normalize=False
         ).to(device)
 
     def update(self, pred: torch.Tensor, target: torch.Tensor) -> None:
@@ -107,7 +120,7 @@ class RunningMetrics:
         target_y = _rgb_to_y(target)
         self._psnr_y.update(pred_y, target_y)
         self._ssim_y.update(pred_y, target_y)
-        self._lpips.update(pred, target)
+        self._lpips.update(_normalize_to_neg1_1(pred), _normalize_to_neg1_1(target))
 
     def compute(self) -> dict[str, float]:
         """Return accumulated metrics and reset internal state.

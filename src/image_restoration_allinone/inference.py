@@ -85,9 +85,7 @@ def main() -> None:
     for key, value in metrics.items():
         print(f"  {key}: {value:.6f}")
 
-    final_score = (
-        metrics["val/psnr_y"] + 10.0 * metrics["val/ssim_y"] - 5.0 * metrics["val/lpips"]
-    )
+    final_score = metrics["val/psnr_y"] + 10.0 * metrics["val/ssim_y"] - 5.0 * metrics["val/lpips"]
     print(f"\n  Final_Score (PSNR_Y + 10*SSIM_Y - 5*LPIPS): {final_score:.6f}")
 
     # Optional: save comparison images
