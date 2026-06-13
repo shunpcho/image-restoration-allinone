@@ -2,51 +2,28 @@
 
 Note: file extensions may vary.
 
-### Case 1: paired images in a single directory (matched by filename keywords)
+### Case 4: category sub-directories, each containing `LQ/` and `GT/`
 
-Keyword mapping:
-- `_mean`: clean image
-- `_real`: degraded image
-
-```
-  data/dataset1
-  |-- xxx_mean.png
-  |-- xxx_real.png
-  |-- yyy_mean.png
-  |-- yyy_real.png
-  :
-  :
-  `-- zzz_real.png
-```
-
-### Case 2: `train`/`val` subdirectories and paired images in a single directory (matched by filename keywords)
-
-Keyword mapping:
-- `_mean`: clean image
-- `_real`: degraded image
+Each category sub-directory must contain a `LQ/` sub-directory (low-quality / degraded images)
+and a `GT/` sub-directory (ground-truth / clean images). Files are matched by name.
 
 ```
   data/dataset1
-  |-- train
-  |   |-- xxx_mean.png
-  |   |-- xxx_real.png
-  |   |-- yyy_mean.png
-  |   `-- yyy_real.png
-  `-- val
-      |-- xxx_mean.png
-      |-- xxx_real.png
-      |-- yyy_mean.png
-      `-- yyy_real.png
+  |-- Blur
+  |   |-- LQ
+  |   |   |-- xxx.png
+  |   |   `-- yyy.png
+  |   `-- GT
+  |       |-- xxx.png
+  |       `-- yyy.png
+  `-- Haze
+      |-- LQ
+      |   |-- xxx.png
+      |   `-- yyy.png
+      `-- GT
+          |-- xxx.png
+          `-- yyy.png
 ```
 
-### Case 3: separate `clean`/`degre` directories
-
-```
-  data/dataset1
-  |-- clean
-  |   |-- xxx.png
-  |   |-- yyy.png
-  `-- degre
-      |-- xxx.png
-      `-- yyy.png
-```
+All pairs across all categories are collected, shuffled, and split automatically into
+`train` / `val` subsets according to `val_ratio` (default: 10 % for validation).

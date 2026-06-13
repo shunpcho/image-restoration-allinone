@@ -20,6 +20,8 @@ class _DataConfigKwargs(TypedDict, total=False):
     pin_memory: bool
     lq_dir_name: str
     gt_dir_name: str
+    val_ratio: float
+    val_split_seed: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,6 +42,10 @@ class DataConfig:
     """Sub-directory name for low-quality (degraded) images."""
     gt_dir_name: str = "GT"
     """Sub-directory name for ground-truth (clean) images."""
+    val_ratio: float = 0.1
+    """Fraction of all pairs reserved for validation split."""
+    val_split_seed: int = 42
+    """Random seed for reproducible train/val shuffling."""
 
     def __post_init__(self) -> None:
         if self.patch_size <= 0:
@@ -222,6 +228,12 @@ def build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("--num-workers", type=int, default=None, help="DataLoader workers.")
     parser.add_argument("--lq-dir-name", type=str, default=None, help="Sub-directory name for LQ images (default: LQ).")
     parser.add_argument("--gt-dir-name", type=str, default=None, help="Sub-directory name for GT images (default: GT).")
+    parser.add_argument(
+        "--val-ratio", type=float, default=None, help="Fraction of data used for validation (default: 0.1)."
+    )
+    parser.add_argument(
+        "--val-split-seed", type=int, default=None, help="Random seed for train/val split (default: 42)."
+    )
 
     # Model
     parser.add_argument("--width", type=int, default=None, help="NAFNet base channel width.")
@@ -265,6 +277,8 @@ def config_from_args(args: argparse.Namespace) -> Config:
         num_workers=args.num_workers,
         lq_dir_name=args.lq_dir_name,
         gt_dir_name=args.gt_dir_name,
+        val_ratio=args.val_ratio,
+        val_split_seed=args.val_split_seed,
     )
     model = ModelConfig.from_optional_kwargs(
         width=args.width,
