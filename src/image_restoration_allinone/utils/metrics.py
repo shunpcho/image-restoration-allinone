@@ -21,9 +21,10 @@ def _to_scalar(metric_value: torch.Tensor | tuple[torch.Tensor, torch.Tensor]) -
 
 
 def _rgb_to_y(img: torch.Tensor) -> torch.Tensor:
-    """Convert an RGB tensor in [0, 1] to the Y (luminance) channel in [0, 255].
+    """Convert an RGB tensor in [0, 1] to the Y (luminance) channel.
 
-    Uses BT.601 coefficients. Shape: ``(B, C, H, W)`` → ``(B, 1, H, W)``.
+    Uses BT.601 studio-swing coefficients, so output values fall in the
+    range [16, 235] (not [0, 255]).  Shape: ``(B, C, H, W)`` → ``(B, 1, H, W)``.
     """
     r, g, b = img[:, 0:1], img[:, 1:2], img[:, 2:3]
     return 65.481 * r + 128.553 * g + 24.966 * b + 16.0
@@ -72,7 +73,8 @@ class RunningMetrics:
     """Accumulate PSNR, SSIM, MSE, and LPIPS across multiple batches.
 
     Y-channel variants of PSNR and SSIM use BT.601 luminance values in [0, 255].
-    LPIPS is computed on full RGB images normalised from [0, 1] to [-1, 1].
+    LPIPS is computed on full RGB images in [0, 1]; normalization to [-1, 1]
+    is handled internally by ``LearnedPerceptualImagePatchSimilarity``.
 
     Example::
 
