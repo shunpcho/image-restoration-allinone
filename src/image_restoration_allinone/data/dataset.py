@@ -48,8 +48,10 @@ def discover_pairs_category(
         if not lq_dir.is_dir() or not gt_dir.is_dir():
             continue
         for lq_path in sorted(lq_dir.iterdir()):
+            if not lq_path.is_file():
+                continue
             gt_path = gt_dir / lq_path.name
-            if gt_path.exists():
+            if gt_path.is_file():
                 pairs.append((lq_path, gt_path))
     return pairs
 
