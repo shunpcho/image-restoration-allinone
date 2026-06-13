@@ -72,6 +72,7 @@ class Trainer:
         _set_seed(self.cfg.seed)
         for epoch in range(1, self.cfg.epochs + 1):
             print(f"Epoch {epoch}/{self.cfg.epochs} :")
+            self.epoch = epoch
 
             train_loss, _ = self._train_epoch()
             val_loss, val_components = self._validate_epoch()
@@ -102,7 +103,8 @@ class Trainer:
         """
         self.model.train(train)
         dataloader = self.train_loader if train else self.val_loader
-        self.total_steps = self.cfg.epochs * len(dataloader)
+        self.step_in_epoch = len(dataloader)
+        self.total_steps = self.cfg.epochs * self.step_in_epoch
         total_components: dict[str, torch.Tensor] = {}
         total_loss = torch.tensor(0.0, device=self.device)
 
@@ -132,10 +134,11 @@ class Trainer:
 
                 # Log training metrics to MLflow if logger is provided.
                 self._log_train_metrics(self.optimizer, loss, component, step)
-                self._print_progress(step, loss, train)
 
-        epoch_loss = total_loss / self.total_steps
-        epoch_components = {key: value / self.total_steps for key, value in total_components.items()}
+            self._print_progress(step, loss, train)
+
+        epoch_loss = total_loss / self.step_in_epoch
+        epoch_components = {key: value / self.step_in_epoch for key, value in total_components.items()}
         return float(epoch_loss.item()), epoch_components
 
     def _train_epoch(self) -> tuple[float, dict[str, torch.Tensor]]:
@@ -163,7 +166,7 @@ class Trainer:
                 "train/lr": lr,
                 **{f"train/{k}": float(v.item()) for k, v in components.items()},
             }
-            self.logger.log_metrics(train_metrics, step=step + (self.cfg.epochs - 1) * len(self.train_loader))
+            self.logger.log_metrics(train_metrics, step=step + (self.epoch - 1) * self.step_in_epoch)
 
     def _save_checkpoint(self, epoch: int) -> None:
         """Save model checkpoint for the current epoch."""
@@ -204,14 +207,14 @@ class Trainer:
             loss: Loss value for the current step.
             train: Whether this is a training step or validation step.
         """
-        pre_str = f"{step} / {self.total_steps} ["
+        pre_str = f"{step} / {self.step_in_epoch} ["
 
         loss_str = f"] Train Loss: {loss.item():.6f}" if train else "] Val..."
 
         term_cols = shutil.get_terminal_size(fallback=(156, 38)).columns
         progress_bar_len = max(16, min(term_cols - len(pre_str) - len(loss_str) - 1, 30))
-        progress = int(progress_bar_len * (step / self.total_steps))
+        progress = int(progress_bar_len * (step / self.step_in_epoch))
         progress_bar_str = f"{progress * '='}>{(progress_bar_len - progress) * '.'}"
 
         full_string = pre_str + progress_bar_str + loss_str
-        print(full_string, end=("\r" if step < self.total_steps else "\n"), flush=True)
+        print(full_string, end=("\r" if step < self.step_in_epoch else "\n"), flush=True)
