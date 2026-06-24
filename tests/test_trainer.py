@@ -67,7 +67,7 @@ def _patch_epoch_methods(
         return 0.0, {}
 
     def fake_save_checkpoint(_epoch: int) -> None:
-        return None
+        pass
 
     monkeypatch.setattr(trainer, "_train_epoch", fake_train_epoch)
     monkeypatch.setattr(trainer, "_validate_epoch", fake_validate_epoch)
