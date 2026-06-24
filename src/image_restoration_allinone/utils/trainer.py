@@ -75,10 +75,13 @@ class Trainer:
             self.epoch = epoch
 
             train_loss, _ = self._train_epoch()
-            val_loss, val_components = self._validate_epoch()
-
-            # Log metrics to MLflow if logger is provided.
-            self._log_validation_metrics(val_loss, val_components, epoch)
+            should_validate = (epoch % self.cfg.val_interval == 0) or (epoch == self.cfg.epochs)
+            if should_validate:
+                val_loss, val_components = self._validate_epoch()
+                # Log metrics to MLflow if logger is provided.
+                self._log_validation_metrics(val_loss, val_components, epoch)
+            else:
+                val_loss = float("nan")
             self._print_epoch_summary(epoch, train_loss, val_loss)
 
             # Checkpoint

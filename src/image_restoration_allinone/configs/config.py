@@ -165,8 +165,8 @@ class TrainConfig:
     """Number of image pairs per batch."""
     total_iters: int = 200_000
     """Total number of training iterations."""
-    val_interval: int = 1_000
-    """Run validation every N iterations."""
+    val_interval: int = 1
+    """Run validation every N epochs."""
     save_interval: int = 10_000
     """Save a checkpoint every N iterations."""
     epochs: int = 100
