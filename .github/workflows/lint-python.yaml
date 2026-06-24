@@ -49,7 +49,7 @@ jobs:
         with:
           python-version: "3.13"
       - name: Install dependencies
-        run: uv sync --group lint
+        run: uv sync --all-groups
 
       - name: Run pyright
         run: uv run pyright src tests
