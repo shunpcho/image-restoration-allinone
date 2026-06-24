@@ -148,7 +148,7 @@ class TestCheckpointing:
         trainer = _build_trainer(tmp_path, epochs=2, checkpoint_freq=2)
         trainer.run()
 
-        ckpt = torch.load(tmp_path / "checkpoint_epoch_0002.pth", weights_only=False)
+        ckpt = torch.load(tmp_path / "checkpoint_epoch_0002.pth", weights_only=False)  # need full state
         assert "epoch" in ckpt
         assert "model_state_dict" in ckpt
         assert "optimizer_state_dict" in ckpt
