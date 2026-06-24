@@ -74,7 +74,7 @@ def _patch_epoch_methods(
     monkeypatch.setattr(trainer, "_save_checkpoint", fake_save_checkpoint)
 
 
-def test_validation_runs_on_interval_and_final_epoch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_validation_interval_with_final_epoch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     trainer = _build_trainer(tmp_path, epochs=5, val_interval=2)
     validated_epochs: list[int] = []
     _patch_epoch_methods(trainer, monkeypatch, validated_epochs)
@@ -83,7 +83,7 @@ def test_validation_runs_on_interval_and_final_epoch(tmp_path: Path, monkeypatch
     assert validated_epochs == [2, 4, 5]
 
 
-def test_validation_runs_on_final_epoch_when_interval_is_large(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_validation_final_epoch_only(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     trainer = _build_trainer(tmp_path, epochs=3, val_interval=10)
     validated_epochs: list[int] = []
     _patch_epoch_methods(trainer, monkeypatch, validated_epochs)
