@@ -52,9 +52,12 @@ def _build_trainer(output_dir: Path, *, epochs: int, val_interval: int) -> Train
     )
 
 
-def test_validation_runs_on_interval_and_final_epoch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    trainer = _build_trainer(tmp_path, epochs=5, val_interval=2)
-    validated_epochs: list[int] = []
+def _patch_epoch_methods(
+    trainer: Trainer,
+    monkeypatch: pytest.MonkeyPatch,
+    validated_epochs: list[int],
+) -> None:
+    """Patch trainer epoch methods to track validation epochs only."""
 
     def fake_train_epoch() -> tuple[float, dict[str, torch.Tensor]]:
         return 0.0, {}
@@ -69,6 +72,12 @@ def test_validation_runs_on_interval_and_final_epoch(tmp_path: Path, monkeypatch
     monkeypatch.setattr(trainer, "_train_epoch", fake_train_epoch)
     monkeypatch.setattr(trainer, "_validate_epoch", fake_validate_epoch)
     monkeypatch.setattr(trainer, "_save_checkpoint", fake_save_checkpoint)
+
+
+def test_validation_runs_on_interval_and_final_epoch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    trainer = _build_trainer(tmp_path, epochs=5, val_interval=2)
+    validated_epochs: list[int] = []
+    _patch_epoch_methods(trainer, monkeypatch, validated_epochs)
     trainer.run()
 
     assert validated_epochs == [2, 4, 5]
@@ -77,20 +86,7 @@ def test_validation_runs_on_interval_and_final_epoch(tmp_path: Path, monkeypatch
 def test_validation_runs_on_final_epoch_when_interval_is_large(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     trainer = _build_trainer(tmp_path, epochs=3, val_interval=10)
     validated_epochs: list[int] = []
-
-    def fake_train_epoch() -> tuple[float, dict[str, torch.Tensor]]:
-        return 0.0, {}
-
-    def fake_validate_epoch() -> tuple[float, dict[str, torch.Tensor]]:
-        validated_epochs.append(trainer.epoch)
-        return 0.0, {}
-
-    def fake_save_checkpoint(_epoch: int) -> None:
-        return None
-
-    monkeypatch.setattr(trainer, "_train_epoch", fake_train_epoch)
-    monkeypatch.setattr(trainer, "_validate_epoch", fake_validate_epoch)
-    monkeypatch.setattr(trainer, "_save_checkpoint", fake_save_checkpoint)
+    _patch_epoch_methods(trainer, monkeypatch, validated_epochs)
     trainer.run()
 
     assert validated_epochs == [3]
