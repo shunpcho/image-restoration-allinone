@@ -170,9 +170,9 @@ class TrainConfig:
     save_interval: int = 10_000
     """Save a checkpoint every N iterations."""
     epochs: int = 100
-    """Total number of epochs (for trainer_epoch.py)."""
+    """Total number of epochs (epoch-based trainer)."""
     val_interval_epoch: int = 1
-    """Run validation every N epochs (for trainer_epoch.py)."""
+    """Run validation every N epochs (epoch-based trainer)."""
     checkpoint_freq: int = 10
     """Frequency of saving checkpoints (in epochs)."""
     lr: float = 1e-3
