@@ -1,9 +1,9 @@
-"""Training loop (iteration-based) with MLflow logging and AMP."""
+"""Training loop epoch-based."""
 
 from __future__ import annotations
 
 import random
-from collections.abc import Generator
+import shutil
 from pathlib import Path
 
 import numpy as np
@@ -13,11 +13,11 @@ from torch.amp.grad_scaler import GradScaler
 from torch.utils.data import DataLoader
 
 from image_restoration_allinone.configs.config import TrainConfig
-from image_restoration_allinone.utils.evaluator import Evaluator
 from image_restoration_allinone.utils.logger import MLflowLogger
 
 
 def _set_seed(seed: int) -> None:
+    """Set random seed for reproducibility."""
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -26,7 +26,7 @@ def _set_seed(seed: int) -> None:
 
 
 class Trainer:
-    """Iteration-based trainer for the all-in-one restoration model.
+    """Epoch-based trainer for the all-in-one restoration model.
 
     Args:
         model: The restoration network.
@@ -51,114 +51,169 @@ class Trainer:
         self.model = model.to(device)
         self.criterion = criterion.to(device)
         self.train_loader = train_loader
+        self.val_loader = val_loader
         self.cfg = cfg
         self.device = device
         self.logger = logger
-
-        self.optimizer = torch.optim.AdamW(
-            model.parameters(),
-            lr=cfg.lr,
-            weight_decay=cfg.weight_decay,
-        )
+        self.optimizer = torch.optim.Adam(model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
         self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
             self.optimizer,
-            T_max=cfg.total_iters,
+            T_max=cfg.epochs * len(train_loader),
             eta_min=cfg.lr_min,
         )
         amp_device = "cuda" if device.type == "cuda" else "cpu"
-        self.scaler: GradScaler = GradScaler(amp_device, enabled=cfg.amp and device.type == "cuda")
+        self.scaler = GradScaler(amp_device, enabled=cfg.amp and device.type == "cuda")
 
-        self.evaluator = Evaluator(model, criterion, val_loader, device)
         self.output_dir = Path(cfg.output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
-
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
 
     def run(self) -> None:
         """Run the full training loop."""
         _set_seed(self.cfg.seed)
-        data_iter = _infinite_loader(self.train_loader)
+        for epoch in range(1, self.cfg.epochs + 1):
+            print(f"Epoch {epoch}/{self.cfg.epochs} :")
+            self.epoch = epoch
 
-        for iteration in range(1, self.cfg.total_iters + 1):
-            loss, components = self._train_step(next(data_iter))
+            train_loss, _ = self._train_epoch()
+            val_loss, val_components = self._validate_epoch()
 
-            # Log training metrics every iteration
-            lr = self.optimizer.param_groups[0]["lr"]
-            metrics: dict[str, float] = {
-                "train/loss": loss,
+            # Log metrics to MLflow if logger is provided.
+            self._log_validation_metrics(val_loss, val_components, epoch)
+            self._print_epoch_summary(epoch, train_loss, val_loss)
+
+            # Checkpoint
+            if epoch % self.cfg.checkpoint_freq == 0 or epoch == self.cfg.epochs:
+                self._save_checkpoint(epoch)
+
+    def _loop(self, train: bool = True) -> tuple[float, dict[str, torch.Tensor]]:
+        """Run one epoch of training.
+
+        Args:
+            train: If True, perform backpropagation and optimization steps. If False, only compute metrics.
+
+        Returns:
+            A dictionary of average metrics for the epoch.
+
+        This method handles both training and validation loops.
+        In training mode, it performs backpropagation with gradient scaling and clipping for stability.
+
+        Use PyTorch's automatic mixed precision (AMP) for efficient training.
+        The GradScaler helps prevent underflow in gradients when using lower precision.
+        And we clip gradients to a max norm to stabilize training.
+        """
+        self.model.train(train)
+        dataloader = self.train_loader if train else self.val_loader
+        self.step_in_epoch = len(dataloader)
+        total_components: dict[str, torch.Tensor] = {}
+        total_loss = torch.tensor(0.0, device=self.device)
+
+        for step, batch in enumerate(dataloader, start=1):
+            degraded = batch["degraded"].to(self.device)
+            clean = batch["clean"].to(self.device)
+
+            if train:
+                self.optimizer.zero_grad()
+            with torch.autocast(self.device.type, enabled=self.cfg.amp):
+                restored = self.model(degraded)
+                loss, component = self.criterion(restored, clean)
+                total_loss += loss.detach()
+                for key, value in component.items():
+                    total_components[key] = (
+                        total_components.get(key, torch.tensor(0.0, device=self.device)) + value.detach()
+                    )
+
+            if train:
+                # If training, backpropagate with gradient scaling and clipping.
+                self.scaler.scale(loss).backward()
+                self.scaler.unscale_(self.optimizer)
+                nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+                self.scaler.step(self.optimizer)
+                self.scaler.update()
+                self.scheduler.step()
+
+                # Log training metrics to MLflow if logger is provided.
+                self._log_train_metrics(self.optimizer, loss, component, step)
+
+            self._print_progress(step, loss, train)
+
+        epoch_loss = total_loss / self.step_in_epoch
+        epoch_components = {key: value / self.step_in_epoch for key, value in total_components.items()}
+        return float(epoch_loss.item()), epoch_components
+
+    def _train_epoch(self) -> tuple[float, dict[str, torch.Tensor]]:
+        """Run training epoch."""
+        return self._loop(train=True)
+
+    def _validate_epoch(self) -> tuple[float, dict[str, torch.Tensor]]:
+        """Run validation epoch."""
+        with torch.inference_mode():
+            return self._loop(train=False)
+
+    @staticmethod
+    def _print_epoch_summary(epoch: int, train_loss: float, val_loss: float) -> None:
+        """Print summary for the current epoch."""
+        print(f"Epoch {epoch} : train_loss={train_loss:.6f}  val_loss={val_loss:.6f}")
+
+    def _log_train_metrics(
+        self, optimizer: torch.optim.Optimizer, loss: torch.Tensor, components: dict[str, torch.Tensor], step: int
+    ) -> None:
+        """Log training metrics to MLflow if logger is provided for each step."""
+        if self.logger is not None:
+            lr = optimizer.param_groups[0]["lr"]
+            train_metrics = {
+                "train/loss": loss.item(),
                 "train/lr": lr,
                 **{f"train/{k}": float(v.item()) for k, v in components.items()},
             }
-            self._log(metrics, iteration)
-            print(f"[{iteration:>8d}/{self.cfg.total_iters}] loss={loss:.6f}  lr={lr:.2e}")
+            self.logger.log_metrics(train_metrics, step=step + (self.epoch - 1) * self.step_in_epoch)
 
-            # Validation on iteration 1 and every val_interval iterations
-            if iteration == 1 or iteration % self.cfg.val_interval == 0:
-                val_metrics = self.evaluator.run()
-                self._log(val_metrics, iteration)
-                print(
-                    f"  [val] loss={val_metrics['val/loss']:.6f}  "
-                    f"mse={val_metrics['val/mse']:.6f}  "
-                    f"psnr={val_metrics['val/psnr']:.2f} dB  "
-                    f"ssim={val_metrics['val/ssim']:.4f}"
-                )
-                self.model.train()
-
-            # Checkpoint
-            if iteration % self.cfg.save_interval == 0:
-                self._save_checkpoint(iteration)
-
-        self._save_checkpoint(self.cfg.total_iters, name="final.pth")
-
-    # ------------------------------------------------------------------
-    # Private helpers
-    # ------------------------------------------------------------------
-
-    def _train_step(self, batch: dict[str, torch.Tensor]) -> tuple[float, dict[str, torch.Tensor]]:
-        self.model.train()
-        degraded = batch["degraded"].to(self.device)
-        clean = batch["clean"].to(self.device)
-
-        self.optimizer.zero_grad(set_to_none=True)
-        with torch.autocast(device_type=self.device.type, enabled=self.cfg.amp):
-            restored = self.model(degraded)
-            total_loss, components = self.criterion(restored, clean)
-
-        self.scaler.scale(total_loss).backward()
-        self.scaler.unscale_(self.optimizer)
-        nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
-        self.scaler.step(self.optimizer)
-        self.scaler.update()
-        self.scheduler.step()
-
-        return float(total_loss.item()), components
-
-    def _save_checkpoint(self, iteration: int, name: str | None = None) -> None:
-        fname = name or f"ckpt_{iteration:08d}.pth"
-        ckpt_path = self.output_dir / fname
+    def _save_checkpoint(self, epoch: int) -> None:
+        """Save model checkpoint for the current epoch."""
+        checkpoint_path = self.output_dir / f"checkpoint_epoch_{epoch:04d}.pth"
         torch.save(
             {
-                "iteration": iteration,
+                "epoch": epoch,
                 "model_state_dict": self.model.state_dict(),
                 "optimizer_state_dict": self.optimizer.state_dict(),
                 "scheduler_state_dict": self.scheduler.state_dict(),
+                "scaler_state_dict": self.scaler.state_dict(),
             },
-            ckpt_path,
+            checkpoint_path,
         )
-        print(f"  Saved checkpoint → {ckpt_path}")
-        if self.logger:
-            self.logger.log_artifact(ckpt_path)
+        print(f"Saved checkpoint -> {checkpoint_path}")
+        if self.logger is not None:
+            self.logger.log_artifact(checkpoint_path)
 
-    def _log(self, metrics: dict[str, float], step: int) -> None:
-        if self.logger:
-            self.logger.log_metrics(metrics, step)
+    def _log_validation_metrics(self, loss: float, components: dict[str, torch.Tensor], epoch: int) -> None:
+        """Log validation metrics to MLflow if logger is provided for each epoch."""
+        if self.logger is not None:
+            val_metrics = {
+                "val/loss": loss,
+                **{f"val/{k}": float(v.item()) for k, v in components.items()},
+            }
+            self.logger.log_metrics(val_metrics, step=epoch)
 
+    def _print_progress(
+        self,
+        step: int,
+        loss: torch.Tensor,
+        train: bool,
+    ) -> None:
+        """Print information related to the current step.
 
-def _infinite_loader(
-    loader: DataLoader[dict[str, torch.Tensor]],
-) -> Generator[dict[str, torch.Tensor]]:
-    """Yield batches indefinitely by restarting the DataLoader."""
-    while True:
-        yield from loader
+        Args:
+            step: Current step (within the epoch).
+            loss: Loss value for the current step.
+            train: Whether this is a training step or validation step.
+        """
+        pre_str = f"{step} / {self.step_in_epoch} ["
+
+        loss_str = f"] Train Loss: {loss.item():.6f}" if train else "] Val..."
+
+        term_cols = shutil.get_terminal_size(fallback=(156, 38)).columns
+        progress_bar_len = max(16, min(term_cols - len(pre_str) - len(loss_str) - 1, 30))
+        progress = int(progress_bar_len * (step / self.step_in_epoch))
+        progress_bar_str = f"{progress * '='}>{(progress_bar_len - progress) * '.'}"
+
+        full_string = pre_str + progress_bar_str + loss_str
+        print(full_string, end=("\r" if step < self.step_in_epoch else "\n"), flush=True)
