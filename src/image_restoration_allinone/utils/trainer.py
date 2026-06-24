@@ -92,8 +92,7 @@ class Trainer:
             train: If True, perform backpropagation and optimization steps. If False, only compute metrics.
 
         Returns:
-            A dictionary of average metrics for the epoch.
-
+            A tuple of ``(epoch_loss, epoch_components)`` where ``epoch_components`` contains per-loss averages for the epoch.
         This method handles both training and validation loops.
         In training mode, it performs backpropagation with gradient scaling and clipping for stability.
 
