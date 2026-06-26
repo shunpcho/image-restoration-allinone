@@ -32,13 +32,13 @@ def main() -> None:
     criterion = LossComposer(cfg.loss)
 
     # Logger
-    logger = MLflowLogger(cfg.train.experiment_name, cfg.train.log_dir)
+    logger = MLflowLogger(cfg.logging)
     logger.start(
         params={
             "data_root": str(cfg.data.data_root),
             "patch_size": cfg.data.patch_size,
             "batch_size": cfg.train.batch_size,
-            "total_iters": cfg.train.total_iters,
+            "epochs": cfg.train.epochs,
             "lr": cfg.train.lr,
             "width": cfg.model.width,
             "losses": str(cfg.loss.losses),

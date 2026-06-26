@@ -135,14 +135,9 @@ class LossConfig:
 
 class _TrainConfigKwargs(TypedDict, total=False):
     output_dir: Path
-    log_dir: Path
-    experiment_name: str
     batch_size: int
-    total_iters: int
-    val_interval: int
-    save_interval: int
     epochs: int
-    val_interval_epoch: int
+    val_interval: int
     checkpoint_freq: int
     lr: float
     lr_min: float
@@ -157,22 +152,12 @@ class TrainConfig:
 
     output_dir: Path = Path("results")
     """Directory where checkpoints are saved."""
-    log_dir: Path = Path("mlruns")
-    """MLflow tracking URI / local directory."""
-    experiment_name: str = "image-restoration-allinone"
-    """MLflow experiment name."""
     batch_size: int = 8
     """Number of image pairs per batch."""
-    total_iters: int = 200_000
-    """Total number of training iterations."""
+    epochs: int = 100
+    """Total number of epochs."""
     val_interval: int = 1
     """Run validation every N epochs."""
-    save_interval: int = 10_000
-    """Save a checkpoint every N iterations."""
-    epochs: int = 100
-    """Total number of epochs (epoch-based trainer)."""
-    val_interval_epoch: int = 1
-    """Run validation every N epochs (epoch-based trainer)."""
     checkpoint_freq: int = 10
     """Frequency of saving checkpoints (in epochs)."""
     lr: float = 1e-3
@@ -189,16 +174,10 @@ class TrainConfig:
     def __post_init__(self) -> None:
         if self.batch_size <= 0:
             raise ValueError(f"batch_size must be positive, got {self.batch_size}")
-        if self.total_iters <= 0:
-            raise ValueError(f"total_iters must be positive, got {self.total_iters}")
-        if self.val_interval <= 0:
-            raise ValueError(f"val_interval must be positive, got {self.val_interval}")
-        if self.save_interval <= 0:
-            raise ValueError(f"save_interval must be positive, got {self.save_interval}")
         if self.epochs <= 0:
             raise ValueError(f"epochs must be positive, got {self.epochs}")
-        if self.val_interval_epoch <= 0:
-            raise ValueError(f"val_interval_epoch must be positive, got {self.val_interval_epoch}")
+        if self.val_interval <= 0:
+            raise ValueError(f"val_interval must be positive, got {self.val_interval}")
         if self.checkpoint_freq <= 0:
             raise ValueError(f"checkpoint_freq must be positive, got {self.checkpoint_freq}")
         if self.lr <= 0:
@@ -206,6 +185,33 @@ class TrainConfig:
 
     @classmethod
     def from_optional_kwargs(cls, **kwargs: Unpack[_TrainConfigKwargs]) -> Self:
+        return cls(**{key: value for key, value in kwargs.items() if value is not None})  # pyright: ignore[reportArgumentType]
+
+
+# ---------------------------------------------------------------------------
+# LoggingConfig
+# ---------------------------------------------------------------------------
+
+
+class _LoggingConfigKwargs(TypedDict, total=False):
+    log_dir: Path
+    experiment_name: str
+    log_img_limit: int
+
+
+@dataclass(frozen=True, slots=True)
+class LoggingConfig:
+    """Configuration for logging and experiment tracking."""
+
+    log_dir: Path = Path("mlruns")
+    """MLflow tracking URI / local directory."""
+    experiment_name: str = "image-restoration-allinone"
+    """MLflow experiment name."""
+    log_img_limit: int = 4
+    """Maximum number of images to log per batch."""
+
+    @classmethod
+    def from_optional_kwargs(cls, **kwargs: Unpack[_LoggingConfigKwargs]) -> Self:
         return cls(**{key: value for key, value in kwargs.items() if value is not None})  # pyright: ignore[reportArgumentType]
 
 
@@ -222,6 +228,7 @@ class Config:
     model: ModelConfig = field(default_factory=ModelConfig)
     loss: LossConfig = field(default_factory=LossConfig)
     train: TrainConfig = field(default_factory=TrainConfig)
+    logging: LoggingConfig = field(default_factory=LoggingConfig)
 
 
 # ---------------------------------------------------------------------------
@@ -263,19 +270,21 @@ def build_argument_parser() -> argparse.ArgumentParser:
 
     # Train
     parser.add_argument("--output-dir", type=Path, default=None)
-    parser.add_argument("--log-dir", type=Path, default=None)
+
     parser.add_argument("--experiment-name", type=str, default=None)
     parser.add_argument("--batch-size", type=int, default=None)
-    parser.add_argument("--total-iters", type=int, default=None)
-    parser.add_argument("--val-interval", type=int, default=None)
-    parser.add_argument("--save-interval", type=int, default=None)
     parser.add_argument("--epochs", type=int, default=None)
-    parser.add_argument("--val-interval-epoch", type=int, default=None)
-    parser.add_argument("--checkpoint-freq", type=int, default=None)
+    parser.add_argument("--val-interval", type=int, default=None)
     parser.add_argument("--lr", type=float, default=None)
     parser.add_argument("--lr-min", type=float, default=None)
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--no-amp", action="store_true", help="Disable AMP.")
+
+    # Logging
+    parser.add_argument("--log-dir", type=Path, default=None)
+    parser.add_argument("--checkpoint-freq", type=int, default=None)
+    parser.add_argument("--log-img-limit", type=int, default=None)
+
     return parser
 
 
@@ -306,18 +315,18 @@ def config_from_args(args: argparse.Namespace) -> Config:
     )
     train = TrainConfig.from_optional_kwargs(
         output_dir=args.output_dir,
-        log_dir=args.log_dir,
-        experiment_name=args.experiment_name,
         batch_size=args.batch_size,
-        total_iters=args.total_iters,
-        val_interval=args.val_interval,
-        save_interval=args.save_interval,
         epochs=args.epochs,
-        val_interval_epoch=args.val_interval_epoch,
+        val_interval=args.val_interval,
         checkpoint_freq=args.checkpoint_freq,
         lr=args.lr,
         lr_min=args.lr_min,
         seed=args.seed,
         amp=not args.no_amp if args.no_amp else True,
     )
-    return Config(data=data, model=model, loss=loss, train=train)
+    logging = LoggingConfig.from_optional_kwargs(
+        log_dir=args.log_dir,
+        experiment_name=args.experiment_name,
+        log_img_limit=args.log_img_limit,
+    )
+    return Config(data=data, model=model, loss=loss, train=train, logging=logging)

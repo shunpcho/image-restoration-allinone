@@ -138,6 +138,7 @@ class Trainer:
 
             self._print_progress(step, loss, train)
 
+        self._log_last_batch_images(clean, degraded, restored, step=self.step_in_epoch)
         epoch_loss = total_loss / self.step_in_epoch
         epoch_components = {key: value / self.step_in_epoch for key, value in total_components.items()}
         return float(epoch_loss.item()), epoch_components
@@ -169,6 +170,22 @@ class Trainer:
             }
             self.logger.log_metrics(train_metrics, step=step + (self.epoch - 1) * self.step_in_epoch)
 
+    def _log_validation_metrics(self, loss: float, components: dict[str, torch.Tensor], epoch: int) -> None:
+        """Log validation metrics to MLflow if logger is provided for each epoch."""
+        if self.logger is not None:
+            val_metrics = {
+                "val/loss": loss,
+                **{f"val/{k}": float(v.item()) for k, v in components.items()},
+            }
+            self.logger.log_metrics(val_metrics, step=epoch)
+
+    def _log_last_batch_images(
+        self, clean: torch.Tensor, degraded: torch.Tensor, restored: torch.Tensor, step: int
+    ) -> None:
+        """Log the last batch of images to MLflow if logger is provided."""
+        if self.logger is not None:
+            self.logger.log_imgs(clean, degraded, restored, step=step)
+
     def _save_checkpoint(self, epoch: int) -> None:
         """Save model checkpoint for the current epoch."""
         checkpoint_path = self.output_dir / f"checkpoint_epoch_{epoch:04d}.pth"
@@ -185,15 +202,6 @@ class Trainer:
         print(f"Saved checkpoint -> {checkpoint_path}")
         if self.logger is not None:
             self.logger.log_artifact(checkpoint_path)
-
-    def _log_validation_metrics(self, loss: float, components: dict[str, torch.Tensor], epoch: int) -> None:
-        """Log validation metrics to MLflow if logger is provided for each epoch."""
-        if self.logger is not None:
-            val_metrics = {
-                "val/loss": loss,
-                **{f"val/{k}": float(v.item()) for k, v in components.items()},
-            }
-            self.logger.log_metrics(val_metrics, step=epoch)
 
     def _print_progress(
         self,
