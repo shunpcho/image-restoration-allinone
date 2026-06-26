@@ -95,7 +95,8 @@ class Trainer:
             train: If True, perform backpropagation and optimization steps. If False, only compute metrics.
 
         Returns:
-            A tuple of ``(epoch_loss, epoch_components)`` where ``epoch_components`` contains per-loss averages for the epoch.
+            A tuple of ``(epoch_loss, epoch_components)`` where ``epoch_components``
+            contains per-loss averages for the epoch.
         This method handles both training and validation loops.
         In training mode, it performs backpropagation with gradient scaling and clipping for stability.
 
@@ -138,7 +139,7 @@ class Trainer:
 
             self._print_progress(step, loss, train)
 
-        self._log_last_batch_images(clean, degraded, restored, step=self.step_in_epoch)
+        self._log_last_batch_images(clean, degraded, restored, step=self.step_in_epoch)  # pyright: ignore[reportPossiblyUnboundVariable]
         epoch_loss = total_loss / self.step_in_epoch
         epoch_components = {key: value / self.step_in_epoch for key, value in total_components.items()}
         return float(epoch_loss.item()), epoch_components
