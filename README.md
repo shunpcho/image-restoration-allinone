@@ -33,10 +33,26 @@ uv run python -m image_restoration_allinone.inference \
   --data-root /path/to/dataset \
   --save-images
 ```
+## Dataset
 
-## Dataset Structure
+### Dataset Structure
 
 See [`docs/data_structure.md`](docs/data_structure.md) for supported dataset layouts.
+
+### Data LoViF
+
+This is datasets of [LoViF](https://lovif-cvpr2026-workshop.github.io/).  
+**LoViF** is a workshop in CVPR2026.  
+It has 5 copmetitions.
+This datasets is from one of the cpmetitions, "[The First Challenge on Real-World All-in-One Image Restoration](https://www.codabench.org/competitions/13251/)" from [FoundIR](https://github.com/House-Leo/FoundIR).
+
+### Files
+
+- `Train.zip`: Train dataset include in several types of degration.
+- `Testset_GT.zip`: Test dataset of ground truth.
+- `Testset_LQ.zip`: Test dataset of low quality.
+- `Val_LQ.zip`: Validate dataset of low qality, but it hasn't ground truth.
+- `Test_LQ.zip`: Test dataset of low qality, but it hasn't ground truth.
 
 ## Development
 
