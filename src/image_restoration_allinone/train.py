@@ -6,7 +6,7 @@ import torch
 
 from image_restoration_allinone.configs.config import build_argument_parser, config_from_args
 from image_restoration_allinone.data.dataloader import build_dataloaders
-from image_restoration_allinone.models.network import build_model
+from image_restoration_allinone.models.nafnet.network import build_model
 from image_restoration_allinone.utils.logger import MLflowLogger
 from image_restoration_allinone.utils.loss import LossComposer
 from image_restoration_allinone.utils.trainer import Trainer

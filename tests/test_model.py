@@ -6,7 +6,7 @@ import pytest
 import torch
 
 from image_restoration_allinone.configs.config import ModelConfig
-from image_restoration_allinone.models.network import build_model, NAFNet
+from image_restoration_allinone.models.nafnet.network import build_model, NAFNet
 
 _DEVICE = torch.device("cpu")
 

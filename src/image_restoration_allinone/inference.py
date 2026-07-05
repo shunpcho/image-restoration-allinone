@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 from image_restoration_allinone.configs.config import LossConfig, ModelConfig
 from image_restoration_allinone.data.dataset import PairedRestorationDataset
 from image_restoration_allinone.data.transforms import build_val_transform
-from image_restoration_allinone.models.network import build_model
+from image_restoration_allinone.models.nafnet.network import build_model
 from image_restoration_allinone.utils.evaluator import Evaluator
 from image_restoration_allinone.utils.loss import LossComposer
 from image_restoration_allinone.utils.visualizer import save_comparison
