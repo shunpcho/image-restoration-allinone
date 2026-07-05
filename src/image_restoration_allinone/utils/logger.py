@@ -20,7 +20,6 @@ class MLflowLogger:
         log_cfg: Logging configuration.
     """
 
-    # def __init__(self, experiment_name: str, tracking_uri: str | Path) -> None:
     def __init__(self, log_cfg: LoggingConfig) -> None:
         mlflow.set_tracking_uri(str(log_cfg.log_dir))
         mlflow.set_experiment(log_cfg.experiment_name)
