@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
-import argparse
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Self, TypedDict, Unpack
+
+from fvcore.common.config import CfgNode
+
+from image_restoration_allinone.configs.generate_config import dataclass_from_class
+from image_restoration_allinone.models.build import MODEL_REGISTRY
 
 # ---------------------------------------------------------------------------
 # DataConfig
@@ -63,11 +67,6 @@ class DataConfig:
 
 class _ModelConfigKwargs(TypedDict, total=False):
     arch_name: str
-    width: int
-    num_blocks: list[int]
-    num_enc_blks: list[int]
-    middle_blk_num: int
-    dropout_rate: float
 
 
 @dataclass(frozen=True, slots=True)
@@ -76,22 +75,22 @@ class ModelConfig:
 
     arch_name: str = "NAFNet"
     """Name of the architecture to use."""
-    width: int = 32
-    """Base channel width of the network."""
-    num_enc_blks: tuple[int, ...] = (1, 1, 1, 28)
-    """Number of NAFBlocks per encoder stage."""
-    middle_blk_num: int = 1
-    """Number of NAFBlocks in the middle (bottleneck) stage."""
-    num_dec_blks: tuple[int, ...] = (1, 1, 1, 1)
-    """Number of NAFBlocks per decoder stage."""
-    dropout_rate: float = 0.0
-    """Dropout rate inside NAFBlocks (0 = disabled)."""
 
     def __post_init__(self) -> None:
-        if len(self.num_enc_blks) != len(self.num_dec_blks):
-            raise ValueError("num_enc_blks and num_dec_blks must have the same length")
-        if self.width <= 0:
-            raise ValueError(f"width must be positive, got {self.width}")
+        """Validate that the specified architecture is registered.
+
+        Generates dataclasses for all registered model classes to ensure that their configurations are available.
+        The configurations are generated dynamically based on the constructor signature of each model class.
+
+
+        Raises:
+            ValueError: If the specified architecture is not registered.
+        """
+        if self.arch_name not in MODEL_REGISTRY._obj_map:
+            raise ValueError(f"Model '{self.arch_name}' is not registered.")
+        model_objects = list(MODEL_REGISTRY._obj_map.values())
+        for model_cls in model_objects:
+            dataclass_from_class(model_cls)
 
     @classmethod
     def from_optional_kwargs(cls, **kwargs: Unpack[_ModelConfigKwargs]) -> Self:
@@ -153,7 +152,7 @@ class _TrainConfigKwargs(TypedDict, total=False):
 class TrainConfig:
     """Top-level configuration for a training run."""
 
-    output_dir: Path = Path("results")
+    output_dir: Path = Path("results/default")
     """Directory where checkpoints are saved."""
     batch_size: int = 8
     """Number of image pairs per batch."""
@@ -206,7 +205,7 @@ class _LoggingConfigKwargs(TypedDict, total=False):
 class LoggingConfig:
     """Configuration for logging and experiment tracking."""
 
-    log_dir: Path = Path("mlruns")
+    log_dir: str = "mlruns"
     """MLflow tracking URI / local directory."""
     experiment_name: str = "image-restoration-allinone"
     """MLflow experiment name."""
@@ -234,104 +233,45 @@ class Config:
     logging: LoggingConfig = field(default_factory=LoggingConfig)
 
 
-# ---------------------------------------------------------------------------
-# argparse helpers
-# ---------------------------------------------------------------------------
-
-
-def build_argument_parser() -> argparse.ArgumentParser:
-    """Build the CLI argument parser for training."""
-    parser = argparse.ArgumentParser(
-        description="Train an all-in-one image restoration model.",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    )
-
-    # Data
-    parser.add_argument("--data-root", type=Path, default=None, help="Dataset root directory.")
-    parser.add_argument("--patch-size", type=int, default=None, help="Training patch size.")
-    parser.add_argument("--no-augmentation", action="store_true", help="Disable data augmentation.")
-    parser.add_argument("--num-workers", type=int, default=None, help="DataLoader workers.")
-    parser.add_argument("--lq-dir-name", type=str, default=None, help="Sub-directory name for LQ images (default: LQ).")
-    parser.add_argument("--gt-dir-name", type=str, default=None, help="Sub-directory name for GT images (default: GT).")
-    parser.add_argument(
-        "--val-ratio", type=float, default=None, help="Fraction of data used for validation (default: 0.1)."
-    )
-    parser.add_argument(
-        "--val-split-seed", type=int, default=None, help="Random seed for train/val split (default: 42)."
-    )
-
-    # Model
-    parser.add_argument("--arch-name", type=str, default=None, help="Model architecture name (default: NAFNet).")
-    parser.add_argument("--width", type=int, default=None, help="NAFNet base channel width.")
-
-    # Loss  (JSON-like: "mse:1.0,ssim:0.1")
-    parser.add_argument(
-        "--losses",
-        type=str,
-        default=None,
-        help='Comma-separated loss:weight pairs, e.g. "mse:1.0,ssim:0.1".',
-    )
-
-    # Train
-    parser.add_argument("--output-dir", type=Path, default=None)
-
-    parser.add_argument("--experiment-name", type=str, default=None)
-    parser.add_argument("--batch-size", type=int, default=None)
-    parser.add_argument("--epochs", type=int, default=None)
-    parser.add_argument("--val-interval", type=int, default=None)
-    parser.add_argument("--lr", type=float, default=None)
-    parser.add_argument("--lr-min", type=float, default=None)
-    parser.add_argument("--seed", type=int, default=None)
-    parser.add_argument("--no-amp", action="store_true", help="Disable AMP.")
-
-    # Logging
-    parser.add_argument("--log-dir", type=Path, default=None)
-    parser.add_argument("--checkpoint-freq", type=int, default=None)
-    parser.add_argument("--log-img-limit", type=int, default=None)
-
-    return parser
-
-
-def config_from_args(args: argparse.Namespace) -> Config:
+def config_from_args(cfg: CfgNode) -> Config:
     """Build a :class:`Config` from parsed CLI arguments."""
     losses: dict[str, float] = {"mse": 1.0}  # default
-    if args.losses is not None:
+    if cfg.loss is not None:
         losses = {}
-        for pair in args.losses.split(","):
+        for pair in cfg.loss.split(","):
             name, _, weight_str = pair.partition(":")
             losses[name.strip()] = float(weight_str.strip()) if weight_str else 1.0
 
     data = DataConfig.from_optional_kwargs(
-        data_root=args.data_root,
-        patch_size=args.patch_size,
-        use_augmentation=not args.no_augmentation if args.no_augmentation else True,
-        num_workers=args.num_workers,
-        lq_dir_name=args.lq_dir_name,
-        gt_dir_name=args.gt_dir_name,
-        val_ratio=args.val_ratio,
-        val_split_seed=args.val_split_seed,
+        data_root=cfg.data.data_root,
+        patch_size=cfg.data.patch_size,
+        use_augmentation=cfg.data.use_augmentation,
+        num_workers=cfg.data.num_workers,
+        lq_dir_name=cfg.data.lq_dir_name,
+        gt_dir_name=cfg.data.gt_dir_name,
+        val_ratio=cfg.data.val_ratio,
+        val_split_seed=cfg.data.val_split_seed,
     )
     model = ModelConfig.from_optional_kwargs(
-        arch_name=args.arch_name,
-        width=args.width,
+        arch_name=cfg.arch_name,
     )
     loss = LossConfig.from_optional_kwargs(
         losses=losses,
     )
     train = TrainConfig.from_optional_kwargs(
-        output_dir=args.output_dir,
-        batch_size=args.batch_size,
-        epochs=args.epochs,
-        val_interval=args.val_interval,
-        checkpoint_freq=args.checkpoint_freq,
-        lr=args.lr,
-        lr_min=args.lr_min,
-        seed=args.seed,
-        amp=not args.no_amp if args.no_amp else True,
+        output_dir=cfg.output_dir,
+        batch_size=cfg.batch_size,
+        epochs=cfg.epochs,
+        val_interval=cfg.val_interval,
+        checkpoint_freq=cfg.checkpoint_freq,
+        lr=cfg.lr,
+        lr_min=cfg.lr_min,
+        seed=cfg.seed,
+        amp=cfg.data.amp,
     )
     logging = LoggingConfig.from_optional_kwargs(
-        log_dir=args.log_dir,
-        experiment_name=args.experiment_name,
-        log_img_limit=args.log_img_limit,
+        log_dir=cfg.log_dir,
+        experiment_name=cfg.experiment_name,
+        log_img_limit=cfg.log_img_limit,
     )
     return Config(data=data, model=model, loss=loss, train=train, logging=logging)

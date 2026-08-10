@@ -6,7 +6,6 @@ from image_restoration_allinone.configs.config import ModelConfig
 MODEL_REGISTRY = Registry("MODEL")
 
 
-@MODEL_REGISTRY.register()
 def build_model(cfg: ModelConfig) -> nn.Module:
     """Builds the image restoration model.
 
