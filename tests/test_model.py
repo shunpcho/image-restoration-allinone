@@ -6,7 +6,8 @@ import pytest
 import torch
 
 from image_restoration_allinone.configs.config import ModelConfig
-from image_restoration_allinone.models.nafnet.network import build_model, NAFNet
+from image_restoration_allinone.models.build import build_model
+from image_restoration_allinone.models.nafnet.network import NAFNet
 
 _DEVICE = torch.device("cpu")
 
@@ -14,7 +15,7 @@ _DEVICE = torch.device("cpu")
 class TestNAFNet:
     @pytest.fixture
     def model(self) -> NAFNet:
-        cfg = ModelConfig(width=8, num_enc_blks=(1, 1), middle_blk_num=1, num_dec_blks=(1, 1))
+        cfg = ModelConfig(arch_name="NAFNet", width=8, num_enc_blks=(1, 1), middle_blk_num=1, num_dec_blks=(1, 1))
         return build_model(cfg).to(_DEVICE)
 
     def test_output_shape_matches_input(self, model: NAFNet) -> None:

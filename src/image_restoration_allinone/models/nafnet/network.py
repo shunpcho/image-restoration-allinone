@@ -12,6 +12,7 @@ import torch.nn.functional as F
 from torch import nn
 
 from image_restoration_allinone.configs.config import ModelConfig
+from image_restoration_allinone.models.build import MODEL_REGISTRY
 
 # ---------------------------------------------------------------------------
 # Building blocks
@@ -110,6 +111,7 @@ def _make_stage(channels: int, num_blocks: int, dropout_rate: float) -> nn.Seque
 # ---------------------------------------------------------------------------
 
 
+@MODEL_REGISTRY.register()
 class NAFNet(nn.Module):
     """U-Net shaped NAFNet for all-in-one image restoration.
 
@@ -185,8 +187,3 @@ class NAFNet(nn.Module):
         # Remove padding
         out = out[:, :, :h, :w]
         return out.clamp(0.0, 1.0)
-
-
-def build_model(cfg: ModelConfig) -> NAFNet:
-    """Construct a :class:`NAFNet` from *cfg*."""
-    return NAFNet(cfg)

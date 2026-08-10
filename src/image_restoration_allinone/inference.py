@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 from image_restoration_allinone.configs.config import LossConfig, ModelConfig
 from image_restoration_allinone.data.dataset import PairedRestorationDataset
 from image_restoration_allinone.data.transforms import build_val_transform
-from image_restoration_allinone.models.nafnet.network import build_model
+from image_restoration_allinone.models.build import build_model
 from image_restoration_allinone.utils.evaluator import Evaluator
 from image_restoration_allinone.utils.loss import LossComposer
 from image_restoration_allinone.utils.visualizer import save_comparison
@@ -26,6 +26,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--data-root", type=Path, required=True, help="Dataset root directory.")
     parser.add_argument("--split", type=str, default="val", help="Dataset split to evaluate.")
     parser.add_argument("--output-dir", type=Path, default=Path("inference_results"))
+    parser.add_argument("--arch-name", type=str, default="NAFNet", help="Model architecture name.")
     parser.add_argument("--width", type=int, default=32)
     parser.add_argument("--save-images", action="store_true", help="Save side-by-side comparison images.")
     return parser.parse_args()
@@ -62,7 +63,7 @@ def main() -> None:
     print(f"Using device: {device}")
 
     # Model
-    model_cfg = ModelConfig(width=args.width)
+    model_cfg = ModelConfig(arch_name=args.arch_name, width=args.width)
     model = build_model(model_cfg).to(device)
 
     ckpt = torch.load(args.checkpoint, map_location=device, weights_only=True)
