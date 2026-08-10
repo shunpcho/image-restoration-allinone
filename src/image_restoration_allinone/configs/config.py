@@ -62,6 +62,7 @@ class DataConfig:
 
 
 class _ModelConfigKwargs(TypedDict, total=False):
+    arch_name: str
     width: int
     num_blocks: list[int]
     num_enc_blks: list[int]
@@ -73,6 +74,8 @@ class _ModelConfigKwargs(TypedDict, total=False):
 class ModelConfig:
     """Configuration for the NAFNet restoration model."""
 
+    arch_name: str = "NAFNet"
+    """Name of the architecture to use."""
     width: int = 32
     """Base channel width of the network."""
     num_enc_blks: tuple[int, ...] = (1, 1, 1, 28)
@@ -258,6 +261,7 @@ def build_argument_parser() -> argparse.ArgumentParser:
     )
 
     # Model
+    parser.add_argument("--arch-name", type=str, default=None, help="Model architecture name (default: NAFNet).")
     parser.add_argument("--width", type=int, default=None, help="NAFNet base channel width.")
 
     # Loss  (JSON-like: "mse:1.0,ssim:0.1")
@@ -308,6 +312,7 @@ def config_from_args(args: argparse.Namespace) -> Config:
         val_split_seed=args.val_split_seed,
     )
     model = ModelConfig.from_optional_kwargs(
+        arch_name=args.arch_name,
         width=args.width,
     )
     loss = LossConfig.from_optional_kwargs(
