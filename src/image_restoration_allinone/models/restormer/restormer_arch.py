@@ -7,6 +7,8 @@ import torch
 from einops import rearrange
 from torch import nn
 
+from image_restoration_allinone.models.build import MODEL_REGISTRY
+
 
 ##########################################################################
 # Layer Norm
@@ -246,7 +248,7 @@ class Downsample(nn.Module):
     def __init__(self, n_feat: int) -> None:
         super().__init__()
         self.body = nn.Sequential(
-            nn.Conv2d(n_feat, n_feat // 2, kernel_size=3, stride=2, padding=1, bias=False), nn.PixelUnshuffle(2)
+            nn.Conv2d(n_feat, n_feat // 2, kernel_size=3, stride=1, padding=1, bias=False), nn.PixelUnshuffle(2)
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -271,46 +273,22 @@ class Upsample(nn.Module):
 
 
 ##########################################################################
-# Restormer
-class Restormer(nn.Module):
-    """Restormer architecture for image restoration.
-
-    Args:
-        inp_channels: Number of input channels.
-        out_channels: Number of output channels.
-        dim: Base dimension for the model. The default is 48.
-        num_blocks: List of number of transformer blocks at each stage. The default is [4, 6, 6, 8].
-        num_refinement_blocks: Number of transformer blocks in the refinement stage. The default is 4.
-        heads: List of number of attention heads at each stage. The default is [1, 2, 4, 8].
-        ffn_expansion_factor: Expansion factor for the feed-forward network. The default is 2.66.
-        bias: Whether to include a bias term in the convolutional layers. The default is False.
-        layer_norm_type: Type of layer normalization to use ("BiasFree" or "WithBias"). The default is "WithBias".
-        dual_pixel_task: Whether to use dual pixel task. The default is False.
-                         True for dual-pixel defocus deblurring only. Also, set inp_channels=6.
-    """
+# Encoder
+class Encoder(nn.Module):
+    """Hierarchical encoder used by Restormer."""
 
     def __init__(
         self,
         inp_channels: int,
-        out_channels: int,
-        dim: int = 48,
-        num_blocks: list[int] | None = None,
-        num_refinement_blocks: int = 4,
-        heads: list[int] | None = None,
-        ffn_expansion_factor: float = 2.66,
-        bias: bool = False,
-        layer_norm_type: str = "WithBias",
-        dual_pixel_task: bool = False,
+        dim: int,
+        num_blocks: list[int],
+        heads: list[int],
+        ffn_expansion_factor: float,
+        bias: bool,
+        layer_norm_type: str,
     ) -> None:
         super().__init__()
-
-        if num_blocks is None:
-            num_blocks = [4, 6, 6, 8]
-        if heads is None:
-            heads = [1, 2, 4, 8]
-
         self.patch_embed = OverlapPatchEmbed(inp_channels, dim)
-
         self.encoder_level1 = nn.Sequential(
             *[
                 TransformerBlock(
@@ -366,6 +344,30 @@ class Restormer(nn.Module):
             ]
         )
 
+    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        out_enc_level1 = self.encoder_level1(self.patch_embed(x))
+        out_enc_level2 = self.encoder_level2(self.down1_2(out_enc_level1))
+        out_enc_level3 = self.encoder_level3(self.down2_3(out_enc_level2))
+        latent = self.latent(self.down3_4(out_enc_level3))
+        return out_enc_level1, out_enc_level2, out_enc_level3, latent
+
+
+##########################################################################
+# Decoder
+class Decoder(nn.Module):
+    """Hierarchical decoder and refinement stage used by Restormer."""
+
+    def __init__(
+        self,
+        dim: int,
+        num_blocks: list[int],
+        num_refinement_blocks: int,
+        heads: list[int],
+        ffn_expansion_factor: float,
+        bias: bool,
+        layer_norm_type: str,
+    ) -> None:
+        super().__init__()
         self.up4_3 = Upsample(int(dim * 2**3))
         self.reduce_chan_level3 = nn.Conv2d(int(dim * 2**3), int(dim * 2**2), kernel_size=1, bias=bias)
         self.decoder_level3 = nn.Sequential(
@@ -401,8 +403,8 @@ class Restormer(nn.Module):
         self.decoder_level1 = nn.Sequential(
             *[
                 TransformerBlock(
-                    dim=dim,
-                    num_heads=heads[0],
+                    dim=int(dim * 2**1),
+                    num_heads=heads[1],
                     ffn_expansion_factor=ffn_expansion_factor,
                     bias=bias,
                     layer_norm_type=layer_norm_type,
@@ -424,28 +426,13 @@ class Restormer(nn.Module):
             ]
         )
 
-        """For Dual-Pixel Defocus Deblurring Task."""
-        self.dual_pixel_task = dual_pixel_task
-        if self.dual_pixel_task:
-            self.skip_conv = nn.Conv2d(int(dim * 2**1), out_channels, kernel_size=3, stride=1, padding=1, bias=bias)
-
-        self.output = nn.Conv2d(int(dim * 2**1), out_channels, kernel_size=3, stride=1, padding=1, bias=bias)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # Encoder
-        inp_enc_level1 = self.patch_embed(x)
-        out_enc_level1 = self.encoder_level1(inp_enc_level1)
-
-        inp_enc_level2 = self.down1_2(out_enc_level1)
-        out_enc_level2 = self.encoder_level2(inp_enc_level2)
-
-        inp_enc_level3 = self.down2_3(out_enc_level2)
-        out_enc_level3 = self.encoder_level3(inp_enc_level3)
-
-        inp_enc_level4 = self.down3_4(out_enc_level3)
-        latent = self.latent(inp_enc_level4)
-
-        # Decoder
+    def forward(
+        self,
+        out_enc_level1: torch.Tensor,
+        out_enc_level2: torch.Tensor,
+        out_enc_level3: torch.Tensor,
+        latent: torch.Tensor,
+    ) -> torch.Tensor:
         inp_dec_level3 = self.up4_3(latent)
         inp_dec_level3 = torch.cat([inp_dec_level3, out_enc_level3], dim=1)
         inp_dec_level3 = self.reduce_chan_level3(inp_dec_level3)
@@ -460,15 +447,63 @@ class Restormer(nn.Module):
         inp_dec_level1 = torch.cat([inp_dec_level1, out_enc_level1], dim=1)
         out_dec_level1 = self.decoder_level1(inp_dec_level1)
 
-        # Refinement
-        out_refinement = self.refinement(out_dec_level1)
+        return self.refinement(out_dec_level1)
+
+
+##########################################################################
+# Restormer
+@MODEL_REGISTRY.register()
+class Restormer(nn.Module):
+    """Restormer architecture for image restoration.
+
+    Args:
+        inp_channels: Number of input channels.
+        out_channels: Number of output channels.
+        dim: Base dimension for the model. The default is 48.
+        num_blocks: List of number of transformer blocks at each stage. The default is [4, 6, 6, 8].
+        num_refinement_blocks: Number of transformer blocks in the refinement stage. The default is 4.
+        heads: List of number of attention heads at each stage. The default is [1, 2, 4, 8].
+        ffn_expansion_factor: Expansion factor for the feed-forward network. The default is 2.66.
+        bias: Whether to include a bias term in the convolutional layers. The default is False.
+        layer_norm_type: Type of layer normalization to use ("BiasFree" or "WithBias"). The default is "WithBias".
+        dual_pixel_task: Whether to use dual pixel task. The default is False.
+                         True for dual-pixel defocus deblurring only. Also, set inp_channels=6.
+    """
+
+    def __init__(
+        self,
+        inp_channels: int,
+        out_channels: int,
+        dim: int = 48,
+        num_blocks: list[int] | None = None,
+        num_refinement_blocks: int = 4,
+        heads: list[int] | None = None,
+        ffn_expansion_factor: float = 2.66,
+        bias: bool = False,
+        layer_norm_type: str = "WithBias",
+        dual_pixel_task: bool = False,
+    ) -> None:
+        super().__init__()
+
+        if num_blocks is None:
+            num_blocks = [4, 6, 6, 8]
+        if heads is None:
+            heads = [1, 2, 4, 8]
+
+        self.encoder = Encoder(inp_channels, dim, num_blocks, heads, ffn_expansion_factor, bias, layer_norm_type)
+        self.decoder = Decoder(
+            dim, num_blocks, num_refinement_blocks, heads, ffn_expansion_factor, bias, layer_norm_type
+        )
+        self.dual_pixel_task = dual_pixel_task
+        if dual_pixel_task:
+            self.skip_conv = nn.Conv2d(dim, out_channels, kernel_size=3, stride=1, padding=1, bias=bias)
+        self.output = nn.Conv2d(int(dim * 2**1), out_channels, kernel_size=3, stride=1, padding=1, bias=bias)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        out_enc_level1, out_enc_level2, out_enc_level3, latent = self.encoder(x)
+        out_refinement = self.decoder(out_enc_level1, out_enc_level2, out_enc_level3, latent)
 
         # For Dual-Pixel Defocus Deblurring Task.
         if self.dual_pixel_task:
-            out_dec_level1_dp = out_dec_level1 + self.skip_conv(out_refinement)
-            out_dec = self.output(out_dec_level1_dp)
-
-        else:
-            out_dec = x + self.output(out_refinement)
-
-        return out_dec
+            return self.skip_conv(out_enc_level1) + self.output(out_refinement)
+        return x + self.output(out_refinement)
