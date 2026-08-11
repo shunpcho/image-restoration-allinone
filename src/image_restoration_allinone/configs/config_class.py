@@ -76,7 +76,7 @@ class ConfigurationError(ValueError):
 
 def _model_parameters_class(arch_name: str) -> type:
     try:
-        model_clas = MODEL_REGISTRY.get(arch_name)
+        model_class = MODEL_REGISTRY.get(arch_name)
     except KeyError as exc:
         raise ConfigurationError(f"Model '{arch_name}' is not registered.") from exc
     return dataclass_from_class(model_class)

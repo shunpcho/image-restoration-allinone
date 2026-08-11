@@ -1,7 +1,7 @@
 train_sample:
     train \
         --config config_yaml/config.yaml \
-        --data.data-root data/samples
+        data.data_root data/samples
 
 train:
     train \
