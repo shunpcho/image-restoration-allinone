@@ -1,10 +1,10 @@
 """Configuration module."""
 
 from image_restoration_allinone.configs.config import (
-    build_argument_parser,
     Config,
-    config_from_args,
+    config_from_cfg_node,
     DataConfig,
+    LoggingConfig,
     LossConfig,
     ModelConfig,
     TrainConfig,
@@ -13,9 +13,9 @@ from image_restoration_allinone.configs.config import (
 __all__ = [
     "Config",
     "DataConfig",
+    "LoggingConfig",
     "LossConfig",
     "ModelConfig",
     "TrainConfig",
-    "build_argument_parser",
-    "config_from_args",
+    "config_from_cfg_node",
 ]

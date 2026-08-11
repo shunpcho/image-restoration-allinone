@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import torch
 
-from image_restoration_allinone.configs.config import build_argument_parser, config_from_args
+from image_restoration_allinone.configs.parser import load_config, parse_args
 from image_restoration_allinone.data.dataloader import build_dataloaders
 from image_restoration_allinone.models.build import build_model
 from image_restoration_allinone.utils.logger import MLflowLogger
@@ -14,9 +14,8 @@ from image_restoration_allinone.utils.trainer import Trainer
 
 def main() -> None:
     """Parse CLI arguments and start training."""
-    parser = build_argument_parser()
-    args = parser.parse_args()
-    cfg = config_from_args(args)
+    args = parse_args()
+    cfg = load_config(args)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
@@ -40,7 +39,7 @@ def main() -> None:
             "batch_size": cfg.train.batch_size,
             "epochs": cfg.train.epochs,
             "lr": cfg.train.lr,
-            "width": cfg.model.width,
+            "model_parameters": str(cfg.model.parameters),
             "losses": str(cfg.loss.losses),
         }
     )

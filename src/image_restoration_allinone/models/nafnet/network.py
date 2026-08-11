@@ -11,7 +11,6 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from image_restoration_allinone.configs.config import ModelConfig
 from image_restoration_allinone.models.build import MODEL_REGISTRY
 
 # ---------------------------------------------------------------------------
@@ -120,14 +119,18 @@ class NAFNet(nn.Module):
     to handle blur, low-light, rain, and other corruptions from paired data.
     """
 
-    def __init__(self, cfg: ModelConfig) -> None:
+    def __init__(
+        self,
+        width: int = 32,
+        num_enc_blks: tuple[int, ...] = (1, 1, 1, 28),
+        middle_blk_num: int = 1,
+        num_dec_blks: tuple[int, ...] = (1, 1, 1, 1),
+        dropout_rate: float = 0.0,
+    ) -> None:
         super().__init__()
-        width = cfg.width
-        enc_blks = cfg.num_enc_blks
-        mid_blks = cfg.middle_blk_num
-        dec_blks = cfg.num_dec_blks
-        drop = cfg.dropout_rate
-        num_stages = len(enc_blks)
+        if len(num_enc_blks) != len(num_dec_blks):
+            raise ValueError("num_enc_blks and num_dec_blks must have the same length")
+        num_stages = len(num_enc_blks)
 
         self.intro = nn.Conv2d(3, width, 3, padding=1)
 
@@ -135,21 +138,21 @@ class NAFNet(nn.Module):
         self.encoders = nn.ModuleList()
         self.downs = nn.ModuleList()
         ch = width
-        for num_blks in enc_blks:
-            self.encoders.append(_make_stage(ch, num_blks, drop))
+        for num_blks in num_enc_blks:
+            self.encoders.append(_make_stage(ch, num_blks, dropout_rate))
             self.downs.append(nn.Conv2d(ch, ch * 2, 2, stride=2))
             ch *= 2
 
         # ---- Middle ----
-        self.middle = _make_stage(ch, mid_blks, drop)
+        self.middle = _make_stage(ch, middle_blk_num, dropout_rate)
 
         # ---- Decoder ----
         self.ups = nn.ModuleList()
         self.decoders = nn.ModuleList()
-        for num_blks in dec_blks:
+        for num_blks in num_dec_blks:
             self.ups.append(nn.Sequential(nn.Conv2d(ch, ch * 2, 1), nn.PixelShuffle(2)))
             ch //= 2
-            self.decoders.append(_make_stage(ch, num_blks, drop))
+            self.decoders.append(_make_stage(ch, num_blks, dropout_rate))
 
         self.ending = nn.Conv2d(ch, 3, 3, padding=1)
         self._num_stages = num_stages

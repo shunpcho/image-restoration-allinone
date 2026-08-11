@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Self, TypedDict, Unpack
+from typing import cast, Self, TypedDict, Unpack
 
 from fvcore.common.config import CfgNode
 
@@ -65,36 +66,56 @@ class DataConfig:
 # ---------------------------------------------------------------------------
 
 
-class _ModelConfigKwargs(TypedDict, total=False):
-    arch_name: str
+_UNSET = object()
+_LOSS_PAIR_LENGTH = 2
+
+
+class ConfigurationError(ValueError):
+    """Raised when an input configuration does not match the application schema."""
+
+
+def _model_parameters_class(arch_name: str) -> type:
+    try:
+        model_class = MODEL_REGISTRY.get(arch_name)
+    except KeyError as exc:
+        raise ConfigurationError(f"Model '{arch_name}' is not registered.") from exc
+    return dataclass_from_class(model_class)
 
 
 @dataclass(frozen=True, slots=True)
 class ModelConfig:
-    """Configuration for the NAFNet restoration model."""
+    """Configuration for a registered restoration model."""
 
     arch_name: str = "NAFNet"
     """Name of the architecture to use."""
+    parameters: object = field(default=_UNSET)
+    """Architecture-specific configuration generated from the model constructor."""
 
     def __post_init__(self) -> None:
-        """Validate that the specified architecture is registered.
-
-        Generates dataclasses for all registered model classes to ensure that their configurations are available.
-        The configurations are generated dynamically based on the constructor signature of each model class.
-
+        """Create default parameters and validate explicitly supplied parameters.
 
         Raises:
-            ValueError: If the specified architecture is not registered.
+            ConfigurationError: If the parameters do not match the selected architecture.
         """
-        if self.arch_name not in MODEL_REGISTRY._obj_map:
-            raise ValueError(f"Model '{self.arch_name}' is not registered.")
-        model_objects = list(MODEL_REGISTRY._obj_map.values())
-        for model_cls in model_objects:
-            dataclass_from_class(model_cls)
+        parameter_class = _model_parameters_class(self.arch_name)
+        if self.parameters is _UNSET:
+            object.__setattr__(self, "parameters", parameter_class())
+        elif not isinstance(self.parameters, parameter_class):
+            raise ConfigurationError(f"parameters must be an instance of {parameter_class.__name__}")
 
     @classmethod
-    def from_optional_kwargs(cls, **kwargs: Unpack[_ModelConfigKwargs]) -> Self:
-        return cls(**{key: value for key, value in kwargs.items() if value is not None})  # pyright: ignore[reportArgumentType]
+    def from_parameter_kwargs(cls, arch_name: str, **kwargs: object) -> Self:
+        """Build a model configuration from architecture-specific keyword arguments.
+
+        Raises:
+            ConfigurationError: If the keyword arguments do not match the model schema.
+        """
+        parameter_class = _model_parameters_class(arch_name)
+        try:
+            parameters = parameter_class(**kwargs)
+        except TypeError as exc:
+            raise ConfigurationError(f"Invalid configuration at model.{arch_name.lower()}: {exc}") from exc
+        return cls(arch_name=arch_name, parameters=parameters)
 
 
 # ---------------------------------------------------------------------------
@@ -233,45 +254,141 @@ class Config:
     logging: LoggingConfig = field(default_factory=LoggingConfig)
 
 
-def config_from_args(cfg: CfgNode) -> Config:
-    """Build a :class:`Config` from parsed CLI arguments."""
-    losses: dict[str, float] = {"mse": 1.0}  # default
-    if cfg.loss is not None:
-        losses = {}
-        for pair in cfg.loss.split(","):
-            name, _, weight_str = pair.partition(":")
-            losses[name.strip()] = float(weight_str.strip()) if weight_str else 1.0
+def _cfg_node_to_dict(value: object) -> object:
+    if isinstance(value, CfgNode):
+        node = cast("Mapping[object, object]", value)
+        return {str(key): _cfg_node_to_dict(item) for key, item in node.items()}
+    if isinstance(value, list):
+        return [_cfg_node_to_dict(item) for item in cast("list[object]", value)]
+    if isinstance(value, tuple):
+        return tuple(_cfg_node_to_dict(item) for item in cast("tuple[object, ...]", value))
+    return value
 
-    data = DataConfig.from_optional_kwargs(
-        data_root=cfg.data.data_root,
-        patch_size=cfg.data.patch_size,
-        use_augmentation=cfg.data.use_augmentation,
-        num_workers=cfg.data.num_workers,
-        lq_dir_name=cfg.data.lq_dir_name,
-        gt_dir_name=cfg.data.gt_dir_name,
-        val_ratio=cfg.data.val_ratio,
-        val_split_seed=cfg.data.val_split_seed,
+
+def _mapping(value: object, path: str) -> dict[str, object]:
+    if not isinstance(value, Mapping):
+        raise ConfigurationError(f"Invalid configuration at {path}: expected a mapping.")
+    mapping = cast("Mapping[object, object]", value)
+    return {str(key): item for key, item in mapping.items()}
+
+
+def _section(config: Mapping[str, object], name: str) -> dict[str, object]:
+    if name not in config:
+        return {}
+    return _mapping(config[name], name)
+
+
+def _construct(config_class: type, values: Mapping[str, object], path: str) -> object:
+    dataclass_fields = getattr(config_class, "__dataclass_fields__", None)
+    if not isinstance(dataclass_fields, Mapping):
+        raise TypeError(f"{config_class.__name__} must be a dataclass type.")
+    allowed = {
+        str(name)
+        for name, config_field in cast("Mapping[object, object]", dataclass_fields).items()
+        if getattr(config_field, "init", False)
+    }
+    unknown = set(values).difference(allowed)
+    if unknown:
+        key = min(unknown)
+        raise ConfigurationError(f"Unknown configuration key: {path}.{key}")
+    try:
+        return config_class(**values)
+    except (TypeError, ValueError) as exc:
+        raise ConfigurationError(f"Invalid configuration at {path}: {exc}") from exc
+
+
+def _loss_weight(value: object, path: str) -> float:
+    if not isinstance(value, (float, int, str)):
+        raise ConfigurationError(f"Invalid configuration at {path}: expected a numeric weight.")
+    try:
+        return float(value)
+    except ValueError as exc:
+        raise ConfigurationError(f"Invalid configuration at {path}: expected a numeric weight.") from exc
+
+
+def _losses(value: object) -> dict[str, float]:
+    if isinstance(value, Mapping):
+        mapping = cast("Mapping[object, object]", value)
+        return {str(name): _loss_weight(weight, f"loss.losses.{name}") for name, weight in mapping.items()}
+    if not isinstance(value, (list, tuple)):
+        raise ConfigurationError("Invalid configuration at loss.losses: expected a mapping or pairs.")
+
+    losses: dict[str, float] = {}
+    values = cast("list[object] | tuple[object, ...]", value)
+    for index, item in enumerate(values):
+        if not isinstance(item, (list, tuple)):
+            raise ConfigurationError(f"Invalid configuration at loss.losses[{index}]: expected a name and weight pair.")
+        pair = cast("list[object] | tuple[object, ...]", item)
+        if len(pair) != _LOSS_PAIR_LENGTH:
+            raise ConfigurationError(f"Invalid configuration at loss.losses[{index}]: expected a name and weight pair.")
+        name, weight = cast("tuple[object, object]", pair)
+        if not isinstance(name, str):
+            raise ConfigurationError(f"Invalid configuration at loss.losses[{index}][0]: expected a string.")
+        losses[name] = _loss_weight(weight, f"loss.losses[{index}][1]")
+    return losses
+
+
+def _path(value: object, path: str) -> Path:
+    if isinstance(value, Path):
+        return value
+    if isinstance(value, str):
+        return Path(value)
+    raise ConfigurationError(f"Invalid configuration at {path}: expected a path string.")
+
+
+def _data_config(raw_config: Mapping[str, object]) -> DataConfig:
+    data_values = _section(raw_config, "data")
+    if "data_root" in data_values:
+        data_values["data_root"] = _path(data_values["data_root"], "data.data_root")
+    return cast("DataConfig", _construct(DataConfig, data_values, "data"))
+
+
+def _model_config(raw_config: Mapping[str, object]) -> ModelConfig:
+    model_values = _section(raw_config, "model")
+    arch_name = model_values.pop("arch_name", "NAFNet")
+    if not isinstance(arch_name, str):
+        raise ConfigurationError("Invalid configuration at model.arch_name: expected a string.")
+    parameter_section = arch_name.lower()
+    parameter_values = _mapping(model_values.pop(parameter_section, {}), f"model.{parameter_section}")
+    if model_values:
+        key = min(model_values)
+        raise ConfigurationError(f"Unknown configuration key: model.{key}")
+    parameter_class = _model_parameters_class(arch_name)
+    parameters = _construct(parameter_class, parameter_values, f"model.{parameter_section}")
+    return ModelConfig(arch_name=arch_name, parameters=parameters)
+
+
+def _loss_config(raw_config: Mapping[str, object]) -> LossConfig:
+    loss_values = _section(raw_config, "loss")
+    if "losses" in loss_values:
+        loss_values["losses"] = _losses(loss_values["losses"])
+    return cast("LossConfig", _construct(LossConfig, loss_values, "loss"))
+
+
+def _train_config(raw_config: Mapping[str, object]) -> TrainConfig:
+    train_values = _section(raw_config, "train")
+    if "output_dir" in train_values:
+        train_values["output_dir"] = _path(train_values["output_dir"], "train.output_dir")
+    return cast("TrainConfig", _construct(TrainConfig, train_values, "train"))
+
+
+def config_from_cfg_node(cfg: CfgNode) -> Config:
+    """Convert a parsed :class:`CfgNode` into the typed application configuration.
+
+    Raises:
+        ConfigurationError: If the input has unknown keys or invalid configuration values.
+    """
+    raw_config = _mapping(_cfg_node_to_dict(cfg), "root")
+    expected_sections = {"data", "model", "loss", "train", "logging"}
+    unknown_sections = set(raw_config).difference(expected_sections)
+    if unknown_sections:
+        section = min(unknown_sections)
+        raise ConfigurationError(f"Unknown configuration key: {section}")
+
+    return Config(
+        data=_data_config(raw_config),
+        model=_model_config(raw_config),
+        loss=_loss_config(raw_config),
+        train=_train_config(raw_config),
+        logging=cast("LoggingConfig", _construct(LoggingConfig, _section(raw_config, "logging"), "logging")),
     )
-    model = ModelConfig.from_optional_kwargs(
-        arch_name=cfg.arch_name,
-    )
-    loss = LossConfig.from_optional_kwargs(
-        losses=losses,
-    )
-    train = TrainConfig.from_optional_kwargs(
-        output_dir=cfg.output_dir,
-        batch_size=cfg.batch_size,
-        epochs=cfg.epochs,
-        val_interval=cfg.val_interval,
-        checkpoint_freq=cfg.checkpoint_freq,
-        lr=cfg.lr,
-        lr_min=cfg.lr_min,
-        seed=cfg.seed,
-        amp=cfg.data.amp,
-    )
-    logging = LoggingConfig.from_optional_kwargs(
-        log_dir=cfg.log_dir,
-        experiment_name=cfg.experiment_name,
-        log_img_limit=cfg.log_img_limit,
-    )
-    return Config(data=data, model=model, loss=loss, train=train, logging=logging)

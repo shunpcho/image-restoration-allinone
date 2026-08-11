@@ -1,8 +1,7 @@
 import argparse
 from pathlib import Path
 
-from fvcore.common.config import CfgNode
-
+from image_restoration_allinone.configs.config import Config, config_from_cfg_node
 from image_restoration_allinone.configs.default import get_default_cfg
 
 
@@ -14,7 +13,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def load_config(args: argparse.Namespace) -> CfgNode:
+def load_config(args: argparse.Namespace) -> Config:
     """Load the configuration from a file and override with command line options."""
     cfg = get_default_cfg()
 
@@ -25,4 +24,4 @@ def load_config(args: argparse.Namespace) -> CfgNode:
 
     cfg.freeze()
 
-    return cfg
+    return config_from_cfg_node(cfg)

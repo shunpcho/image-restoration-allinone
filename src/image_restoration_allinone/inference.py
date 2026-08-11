@@ -63,7 +63,7 @@ def main() -> None:
     print(f"Using device: {device}")
 
     # Model
-    model_cfg = ModelConfig(arch_name=args.arch_name, width=args.width)
+    model_cfg = ModelConfig.from_parameter_kwargs(args.arch_name, width=args.width)
     model = build_model(model_cfg).to(device)
 
     ckpt = torch.load(args.checkpoint, map_location=device, weights_only=True)
