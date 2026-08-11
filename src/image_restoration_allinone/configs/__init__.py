@@ -1,6 +1,6 @@
 """Configuration module."""
 
-from image_restoration_allinone.configs.config import (
+from image_restoration_allinone.configs.config_class import (
     Config,
     config_from_cfg_node,
     DataConfig,

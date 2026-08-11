@@ -1,7 +1,7 @@
 import argparse
 from pathlib import Path
 
-from image_restoration_allinone.configs.config import Config, config_from_cfg_node
+from image_restoration_allinone.configs.config_class import Config, config_from_cfg_node
 from image_restoration_allinone.configs.default import get_default_cfg
 
 
