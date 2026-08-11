@@ -1,0 +1,4 @@
+data:
+  data-root: data/sample
+train:
+  epochs: 10
