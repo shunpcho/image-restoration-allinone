@@ -10,7 +10,7 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader, Dataset
 
-from image_restoration_allinone.configs.config import LossConfig, TrainConfig
+from image_restoration_allinone.configs.config_class import LossConfig, TrainConfig
 from image_restoration_allinone.utils.loss import LossComposer
 from image_restoration_allinone.utils.trainer import Trainer
 

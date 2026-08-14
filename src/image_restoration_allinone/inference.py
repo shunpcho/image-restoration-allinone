@@ -8,7 +8,7 @@ from pathlib import Path
 import torch
 from torch.utils.data import DataLoader
 
-from image_restoration_allinone.configs.config import LossConfig, ModelConfig
+from image_restoration_allinone.configs.config_class import LossConfig, ModelConfig
 from image_restoration_allinone.data.dataset import PairedRestorationDataset
 from image_restoration_allinone.data.transforms import build_val_transform
 from image_restoration_allinone.models.build import build_model

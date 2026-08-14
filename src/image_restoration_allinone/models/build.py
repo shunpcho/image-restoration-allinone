@@ -7,7 +7,7 @@ from fvcore.common.registry import Registry
 from torch import nn
 
 if TYPE_CHECKING:
-    from image_restoration_allinone.configs.config import ModelConfig
+    from image_restoration_allinone.configs.config_class import ModelConfig
 
 MODEL_REGISTRY = Registry("MODEL")
 

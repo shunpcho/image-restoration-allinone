@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 import torch
 
-from image_restoration_allinone.configs.config import LossConfig
+from image_restoration_allinone.configs.config_class import LossConfig
 from image_restoration_allinone.utils.loss import CharbonnierLoss, LossComposer
 
 

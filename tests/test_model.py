@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 import torch
 
-from image_restoration_allinone.configs.config import ModelConfig
+from image_restoration_allinone.configs.config_class import ModelConfig
 from image_restoration_allinone.models.build import build_model
 from image_restoration_allinone.models.nafnet.network import NAFNet
 
