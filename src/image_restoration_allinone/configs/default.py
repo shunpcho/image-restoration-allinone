@@ -13,7 +13,7 @@ cfg.data.pin_memory = True
 cfg.data.lq_dir_name = "LQ"
 cfg.data.gt_dir_name = "GT"
 cfg.data.val_ratio = 0.1
-cfg.val_split_seed = 42
+cfg.data.val_split_seed = 42
 
 # Model
 cfg.model = CfgNode()

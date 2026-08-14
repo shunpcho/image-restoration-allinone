@@ -12,7 +12,7 @@ from torch import nn
 from torch.amp.grad_scaler import GradScaler
 from torch.utils.data import DataLoader
 
-from image_restoration_allinone.configs.config import TrainConfig
+from image_restoration_allinone.configs.config_class import TrainConfig
 from image_restoration_allinone.utils.logger import MLflowLogger
 
 

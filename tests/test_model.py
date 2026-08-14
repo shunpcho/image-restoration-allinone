@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 import torch
 
-from image_restoration_allinone.configs.config import ModelConfig
+from image_restoration_allinone.configs.config_class import ModelConfig
 from image_restoration_allinone.models.build import build_model
 from image_restoration_allinone.models.nafnet.network import NAFNet
 
@@ -15,7 +15,13 @@ _DEVICE = torch.device("cpu")
 class TestNAFNet:
     @pytest.fixture
     def model(self) -> NAFNet:
-        cfg = ModelConfig(arch_name="NAFNet", width=8, num_enc_blks=(1, 1), middle_blk_num=1, num_dec_blks=(1, 1))
+        cfg = ModelConfig.from_parameter_kwargs(
+            "NAFNet",
+            width=8,
+            num_enc_blks=(1, 1),
+            middle_blk_num=1,
+            num_dec_blks=(1, 1),
+        )
         return build_model(cfg).to(_DEVICE)
 
     def test_output_shape_matches_input(self, model: NAFNet) -> None:
@@ -40,4 +46,4 @@ class TestNAFNet:
 
     def test_mismatched_enc_dec_raises(self) -> None:
         with pytest.raises(ValueError, match="num_enc_blks and num_dec_blks"):
-            ModelConfig(num_enc_blks=(1, 1), num_dec_blks=(1,))
+            build_model(ModelConfig.from_parameter_kwargs("NAFNet", num_enc_blks=(1, 1), num_dec_blks=(1,)))

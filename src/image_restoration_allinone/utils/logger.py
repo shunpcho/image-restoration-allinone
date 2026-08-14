@@ -10,7 +10,7 @@ import numpy as np
 import torch
 import torchvision
 
-from image_restoration_allinone.configs.config import LoggingConfig
+from image_restoration_allinone.configs.config_class import LoggingConfig
 
 
 class MLflowLogger:

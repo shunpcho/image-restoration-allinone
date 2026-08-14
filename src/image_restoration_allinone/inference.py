@@ -8,7 +8,7 @@ from pathlib import Path
 import torch
 from torch.utils.data import DataLoader
 
-from image_restoration_allinone.configs.config import LossConfig, ModelConfig
+from image_restoration_allinone.configs.config_class import LossConfig, ModelConfig
 from image_restoration_allinone.data.dataset import PairedRestorationDataset
 from image_restoration_allinone.data.transforms import build_val_transform
 from image_restoration_allinone.models.build import build_model
@@ -63,7 +63,7 @@ def main() -> None:
     print(f"Using device: {device}")
 
     # Model
-    model_cfg = ModelConfig(arch_name=args.arch_name, width=args.width)
+    model_cfg = ModelConfig.from_parameter_kwargs(args.arch_name, width=args.width)
     model = build_model(model_cfg).to(device)
 
     ckpt = torch.load(args.checkpoint, map_location=device, weights_only=True)

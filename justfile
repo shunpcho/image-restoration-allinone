@@ -1,9 +1,8 @@
 train_sample:
     train \
-        --data-root data/samples \
-        --epochs 100 \
-        --val-interval 5 \
-        --checkpoint-freq 50
+        --config config_yaml/config.yaml \
+        data.data_root data/samples \
+        train.batch_size 4
 
 train:
     train \
