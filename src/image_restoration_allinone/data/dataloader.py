@@ -7,7 +7,7 @@ from pathlib import Path
 import torch
 from torch.utils.data import DataLoader
 
-from image_restoration_allinone.configs.config import DataConfig
+from image_restoration_allinone.configs.config_class import DataConfig
 from image_restoration_allinone.data.dataset import PairedRestorationDataset
 from image_restoration_allinone.data.transforms import build_train_transform, build_val_transform
 

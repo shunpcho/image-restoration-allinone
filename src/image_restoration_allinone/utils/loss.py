@@ -17,7 +17,7 @@ from __future__ import annotations
 import torch
 from torch import nn
 
-from image_restoration_allinone.configs.config import LossConfig
+from image_restoration_allinone.configs.config_class import LossConfig
 
 # ---------------------------------------------------------------------------
 # Individual loss components

@@ -10,7 +10,7 @@ import numpy as np
 import torch
 import torchvision
 
-from image_restoration_allinone.configs.config import LoggingConfig
+from image_restoration_allinone.configs.config_class import LoggingConfig
 
 
 class MLflowLogger:
@@ -21,7 +21,7 @@ class MLflowLogger:
     """
 
     def __init__(self, log_cfg: LoggingConfig) -> None:
-        mlflow.set_tracking_uri(str(log_cfg.log_dir))
+        mlflow.set_tracking_uri(log_cfg.log_dir)
         mlflow.set_experiment(log_cfg.experiment_name)
         self._run: mlflow.ActiveRun | None = None
         self.img_limit = log_cfg.log_img_limit
