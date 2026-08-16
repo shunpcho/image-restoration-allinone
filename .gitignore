@@ -7,8 +7,6 @@ __pycache__/
 /.venv
 /dist
 /logs
-/data/*
-!/data/samples
 /result*
 /.python-version
 # File(s) created by meas.
