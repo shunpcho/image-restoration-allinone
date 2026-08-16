@@ -29,7 +29,7 @@ cfg.model.nafnet.dropout_rate = 0.0
 cfg.model.restormer = CfgNode()
 cfg.model.restormer.inp_channels = 3
 cfg.model.restormer.out_channels = 3
-cfg.model.restormer.embed_dim = 48
+cfg.model.restormer.dim = 48
 
 
 # Loss
