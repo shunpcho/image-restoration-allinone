@@ -36,6 +36,21 @@ def test_unknown_model_parameter_includes_its_path() -> None:
         config_from_cfg_node(cfg)
 
 
+def test_other_model_sections_are_accepted_when_chained() -> None:
+    cfg = CfgNode()
+    cfg.model = CfgNode()
+    cfg.model.arch_name = "NAFNet"
+    cfg.model.nafnet = CfgNode()
+    cfg.model.nafnet.width = 32
+    cfg.model.restormer = CfgNode()
+    cfg.model.restormer.embed_dim = 48
+
+    config = config_from_cfg_node(cfg)
+
+    assert config.model.arch_name == "NAFNet"
+    assert config.model.parameters.width == 32  # pyright: ignore[reportAttributeAccessIssue]
+
+
 def test_model_parameter_dataclass_is_cached() -> None:
     first = config_from_cfg_node(get_default_cfg())
     second = config_from_cfg_node(get_default_cfg())

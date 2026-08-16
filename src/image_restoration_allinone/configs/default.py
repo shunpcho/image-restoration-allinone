@@ -25,6 +25,12 @@ cfg.model.nafnet.num_enc_blks = (1, 1, 1, 28)
 cfg.model.nafnet.middle_blk_num = 1
 cfg.model.nafnet.num_dec_blks = (1, 1, 1, 1)
 cfg.model.nafnet.dropout_rate = 0.0
+# Restormer
+cfg.model.restormer = CfgNode()
+cfg.model.restormer.inp_channels = 3
+cfg.model.restormer.out_channels = 3
+cfg.model.restormer.dim = 48
+
 
 # Loss
 cfg.loss = CfgNode()

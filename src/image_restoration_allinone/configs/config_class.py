@@ -350,9 +350,11 @@ def _model_config(raw_config: Mapping[str, object]) -> ModelConfig:
         raise ConfigurationError("Invalid configuration at model.arch_name: expected a string.")
     parameter_section = arch_name.lower()
     parameter_values = _mapping(model_values.pop(parameter_section, {}), f"model.{parameter_section}")
-    if model_values:
-        key = min(model_values)
-        raise ConfigurationError(f"Unknown configuration key: model.{key}")
+
+    for key, value in model_values.items():
+        if not isinstance(value, Mapping):
+            raise ConfigurationError(f"Unknown configuration key: model.{key}")
+
     parameter_class = _model_parameters_class(arch_name)
     parameters = _construct(parameter_class, parameter_values, f"model.{parameter_section}")
     return ModelConfig(arch_name=arch_name, parameters=parameters)
