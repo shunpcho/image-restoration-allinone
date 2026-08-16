@@ -35,6 +35,17 @@ uv run python -m image_restoration_allinone.inference \
 
 ## Dataset
 
+Two dataset variants are available:
+
+- The [sample dataset](data/sample) is a minimal dataset for debugging.
+- The [training dataset](data/train) is managed with DVC and is used for LoViF experiments.
+
+- Download the training dataset with DVC:
+
+```bash
+dvc pull train
+```
+
 ### Dataset Structure
 
 See [`docs/data_structure.md`](docs/data_structure.md) for supported dataset layouts.
