@@ -4,11 +4,10 @@ All-in-one image restoration model that handles multiple degradation types (blur
 
 ## Features
 
-- **Single model** for multiple degradation types — no task-specific switching required
-- **MSE loss by default**, easily extendable with L1, Charbonnier, SSIM, Perceptual loss
-- **No synthetic degradation** — uses real paired (degraded, clean) datasets
-- **Validation metrics**: loss, MSE, PSNR, SSIM
-- **MLflow** experiment tracking
+- **Supervised training** for image restoration using paired degraded/clean image datasets.
+- **Validate score** for loss, MSE, PSNR, SSIM, and LoViF scores during training.
+- **Flexible configuration** with YAML/CLI overrides and typed config objects for data, model, loss, training, and logging. See [config documentation](src/image_restoration_allinone/configs/README.md) for configuration details.
+- **MLflow integration** for experiment tracking, metric logging, and result comparison.
 
 ## Quickstart
 
@@ -33,6 +32,7 @@ uv run python -m image_restoration_allinone.inference \
   --data-root /path/to/dataset \
   --save-images
 ```
+
 ## Dataset
 
 ### Dataset Structure
@@ -61,4 +61,54 @@ uv run ruff format .
 uv run ruff check .
 uv run pyright
 uv run pytest
+```
+
+### Adding a new model
+
+To add a new restoration model, register it in the model registry and expose its constructor arguments through the config system.
+
+1. Create a new model file under `src/image_restoration_allinone/models/`.
+2. Implement a `torch.nn.Module` subclass.
+3. Register the model with `MODEL_REGISTRY`.
+4. Optionally define the model-specific config values in `default.py`.
+5. Use `arch_name` in the config to select the model.
+
+Example:
+
+```python
+# src/image_restoration_allinone/models/my_model.py
+from torch import nn
+from image_restoration_allinone.models.build import MODEL_REGISTRY
+
+
+@MODEL_REGISTRY.register()
+class MyModel(nn.Module):
+    def __init__(self, width: int = 32, num_blocks: int = 4) -> None:
+        super().__init__()
+        self.width = width
+        self.num_blocks = num_blocks
+
+    def forward(self, x):
+        return x
+```
+
+Then add a config entry like this:
+
+```python
+cfg.model.arch_name = "MyModel"
+cfg.model.my_model = CfgNode()
+cfg.model.my_model.width = 32
+cfg.model.my_model.num_blocks = 4
+```
+
+The registry-based design means the project can automatically build the model from the selected architecture name. In other words, once the model is registered and its constructor signature matches the config fields, it can be used by the training pipeline without extra custom wiring.
+
+When you want to use it from the CLI or YAML config, set:
+
+```yaml
+model:
+  arch_name: MyModel
+  my_model:
+    width: 32
+    num_blocks: 4
 ```
